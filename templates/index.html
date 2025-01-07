@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git-Backed Messaging App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .message {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        #messageForm {
+            margin-top: 20px;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Git-Backed Messaging App</h1>
+    
+    <div id="messages">
+        <!-- Messages will be displayed here -->
+    </div>
+
+    <form id="messageForm">
+        <textarea id="messageContent" rows="4" placeholder="Type your message here..."></textarea>
+        <button type="submit">Send Message</button>
+    </form>
+
+    <script>
+        // Basic functionality to test the server
+        document.getElementById('messageForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const content = document.getElementById('messageContent').value;
+            
+            try {
+                const response = await fetch('/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('messageContent').value = '';
+                    loadMessages();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+
+        async function loadMessages() {
+            try {
+                const response = await fetch('/messages');
+                const messages = await response.json();
+                
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML = messages.map(msg => `
+                    <div class="message">
+                        <p>${msg.content}</p>
+                        <small>${msg.timestamp}</small>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Load messages when page loads
+        loadMessages();
+    </script>
+</body>
+</html>

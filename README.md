@@ -1,91 +1,85 @@
-# Basic Chat Application
+# Git-Backed Messaging Application
 
-A simple real-time chat application that allows users to communicate with each other in a shared chat room.
+A simple web-based messaging application that uses Git as a backend storage system. This application allows users to send and receive messages while maintaining a complete history of all communications using Git.
 
 ## Features
 
-- Real-time messaging
-- Simple and intuitive user interface
-- Support for multiple users
-- Message timestamps
-- Clean and modern design
+- Web-based messaging interface
+- Git-backed message storage
+- Message history with timestamps
+- Simple user authentication
+- Real-time message updates
+- SQLite database for user management
+- GitHub API integration for Git operations
 
-## Technologies Used
+## Tech Stack
 
-- Frontend:
-  - HTML5
-  - CSS3
-  - JavaScript
-  - WebSocket for real-time communication
-
-- Backend:
-  - Python
-  - Flask (Web framework)
-  - Flask-SocketIO (WebSocket support)
-
-## Prerequisites
-
-- Python 3.8 or higher
-- pip (Python package manager)
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone [repository-url]
-cd basic-chat
-```
-
-2. Create a virtual environment (recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-## Running the Application
-
-1. Start the server:
-```bash
-python app.py
-```
-
-2. Open your web browser and navigate to:
-```
-http://localhost:5000
-```
+- Backend: Python (no frameworks)
+- Database: SQLite
+- Frontend: HTML, CSS, JavaScript (vanilla)
+- Version Control: Git
+- API: GitHub REST API
 
 ## Project Structure
 
 ```
-basic-chat/
-├── app.py              # Main application file
+.
+├── README.md
+├── .gitignore
+├── .env
 ├── static/
-│   ├── css/           # Stylesheets
+│   ├── css/
 │   │   └── style.css
-│   └── js/            # JavaScript files
+│   └── js/
 │       └── main.js
-├── templates/         # HTML templates
-│   └── index.html
-├── requirements.txt   # Python dependencies
-└── README.md         # Project documentation
+├── templates/
+│   ├── index.html
+│   └── login.html
+├── database/
+│   └── schema.sql
+├── server.py
+└── requirements.txt
 ```
 
-## Contributing
+## Setup Instructions
 
-1. Fork the repository
-2. Create a new branch
-3. Make your changes
-4. Submit a pull request
+1. Clone the repository
+2. Create a virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+3. Install dependencies:
+   ```bash
+   python3 -m pip install -r requirements.txt
+   ```
+4. Set up your GitHub credentials in `.env` file
+5. Initialize the SQLite database:
+   ```bash
+   python3 init_db.py
+   ```
+6. Run the server:
+   ```bash
+   python3 server.py
+   ```
+
+## Development
+
+This project is being developed incrementally with the following phases:
+1. Basic project setup and structure
+2. User authentication system
+3. Message storage and retrieval
+4. Git integration
+5. Real-time updates
+6. UI improvements
+
+## Security Notes
+
+- Never commit your `.env` file containing sensitive credentials
+- Use environment variables for all sensitive information
+- Implement proper input validation and sanitization
+- Follow security best practices for user authentication
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contact
-
-For any questions or feedback, please open an issue in the repository.
+MIT License
