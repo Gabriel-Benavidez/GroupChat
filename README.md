@@ -41,6 +41,37 @@ A simple web-based messaging application that uses Git as a backend storage syst
 └── requirements.txt
 ```
 
+## Important: Environment Setup Required
+
+Before running the application, you must set up your GitHub authentication:
+
+1. Get a GitHub token:
+   - Go to: https://github.com/settings/tokens
+   - Create new token with scopes: `repo`, `read:discussion`
+   - Copy your token
+
+2. Set up environment:
+```bash
+# Copy the template
+cp .env.template .env
+
+# Edit .env and replace your_github_token_here with your actual token
+```
+
+3. Install and run:
+```bash
+pip install -r requirements.txt
+python init_db_v2.py
+python server.py
+```
+
+Visit `http://127.0.0.1:8888` in your browser.
+
+## Note
+- Never commit your `.env` file
+- Keep your GitHub token secure
+- See API documentation below for usage
+
 ## Setup Instructions
 
 1. Clone the repository
