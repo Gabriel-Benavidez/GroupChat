@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import time
 import threading
 from github_manager import GitHubManager
+import subprocess
 
 class DatabaseManager:
     """Manages SQLite database operations for multiple repositories."""
@@ -356,7 +357,27 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """Handle POST requests."""
-        if self.path == '/messages':
+        if self.path == '/push':
+            try:
+                result = subprocess.run(['./push.py'], capture_output=True, text=True)
+                if result.returncode == 0:
+                    self.send_json_response({
+                        "status": "success",
+                        "message": result.stdout.strip() or "Successfully pushed changes"
+                    })
+                else:
+                    self.send_json_response({
+                        "status": "error",
+                        "message": result.stderr.strip() or "Failed to push changes"
+                    }, HTTPStatus.INTERNAL_SERVER_ERROR)
+            except Exception as e:
+                self.send_json_response({
+                    "status": "error",
+                    "message": str(e)
+                }, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+            
+        elif self.path == '/messages':
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length == 0:
                 self.send_json_response(
