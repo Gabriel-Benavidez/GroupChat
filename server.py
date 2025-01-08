@@ -3,17 +3,18 @@
 import http.server
 import socketserver
 import json
-import urllib.parse
-import os
 import sqlite3
-from http import HTTPStatus
-from typing import Dict, Any, Optional, Tuple, List
-from pathlib import Path
-from datetime import datetime, timezone
+import os
 import time
 import threading
-from github_manager import GitHubManager
+import urllib.parse
 import subprocess
+import traceback
+from datetime import datetime, timezone
+from http import HTTPStatus
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple
+from github_manager import GitHubManager
 
 class DatabaseManager:
     """Manages SQLite database operations for multiple repositories."""
@@ -117,11 +118,16 @@ class DatabaseManager:
                 print(f"Error syncing repository {repo['url']}: {str(e)}")
                 raise
 
-    def get_connection(self) -> sqlite3.Connection:
+    def get_connection(self):
         """Get a database connection."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row  # Enable row factory for named columns
-        return conn
+        try:
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            return conn
+        except Exception as e:
+            print(f"Error connecting to database: {str(e)}")
+            raise
 
     def add_repository(self, name: str, url: str) -> int:
         """
@@ -229,6 +235,22 @@ class DatabaseManager:
             
             cursor = conn.execute(query, params)
             return cursor.fetchone()['count']
+
+    def save_message(self, repository_id: int, content: str, timestamp: str, author: str) -> int:
+        """Save a new message to the database."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute("""
+                    INSERT INTO messages 
+                    (repository_id, content, timestamp, author, message_type)
+                    VALUES (?, ?, ?, ?, 'local')
+                """, (repository_id, content, timestamp, author))
+                conn.commit()
+                return cursor.lastrowid
+        except Exception as e:
+            print(f"Error in save_message: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            raise
 
 class MessageHandler(http.server.SimpleHTTPRequestHandler):
     """Custom HTTP request handler for the messaging application."""
@@ -357,129 +379,99 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """Handle POST requests."""
-        if self.path == '/push':
-            try:
-                result = subprocess.run(['./push.py'], capture_output=True, text=True)
-                if result.returncode == 0:
-                    self.send_json_response({
-                        "status": "success",
-                        "message": result.stdout.strip() or "Successfully pushed changes"
-                    })
-                else:
+        try:
+            if self.path == '/push':
+                try:
+                    result = subprocess.run(['./push.py'], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        self.send_json_response({
+                            "status": "success",
+                            "message": result.stdout.strip() or "Successfully pushed changes"
+                        })
+                    else:
+                        self.send_json_response({
+                            "status": "error",
+                            "message": result.stderr.strip() or "Failed to push changes"
+                        }, HTTPStatus.INTERNAL_SERVER_ERROR)
+                except Exception as e:
                     self.send_json_response({
                         "status": "error",
-                        "message": result.stderr.strip() or "Failed to push changes"
+                        "message": str(e)
                     }, HTTPStatus.INTERNAL_SERVER_ERROR)
-            except Exception as e:
-                self.send_json_response({
-                    "status": "error",
-                    "message": str(e)
-                }, HTTPStatus.INTERNAL_SERVER_ERROR)
-            return
+                return
             
-        elif self.path == '/messages':
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length == 0:
-                self.send_json_response(
-                    {"error": "Empty request body"}, 
-                    HTTPStatus.BAD_REQUEST
-                )
-                return
-
-            try:
-                # Parse request body
-                body = self.rfile.read(content_length)
-                message_data = json.loads(body)
-                
-                # Validate required fields
-                if 'content' not in message_data:
+            elif self.path == '/messages':
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length == 0:
                     self.send_json_response(
-                        {"error": "Message content is required"}, 
+                        {"error": "Empty request body"}, 
                         HTTPStatus.BAD_REQUEST
                     )
                     return
-                
-                # Get message details
-                content = message_data['content']
-                timestamp = message_data.get('timestamp', datetime.utcnow().isoformat())
-                author = message_data.get('author', 'Anonymous')
-                
-                # Save to database
-                repository_id = self.db_manager.add_repository(
-                    name=message_data.get('repository_name', 'Default Repository'),
-                    url=message_data.get('repository_url', 'local')
-                )
-                
-                message_id = self.db_manager.save_message(
-                    repository_id=repository_id,
-                    content=content,
-                    timestamp=timestamp,
-                    author=author
-                )
-                
-                self.send_json_response({
-                    "message": "Message saved successfully",
-                    "id": message_id
-                })
-                
-            except json.JSONDecodeError:
-                self.send_json_response(
-                    {"error": "Invalid JSON"}, 
-                    HTTPStatus.BAD_REQUEST
-                )
-            except Exception as e:
-                print(f"Error saving message: {str(e)}")
-                self.send_json_response(
-                    {"error": "Failed to save message"}, 
-                    HTTPStatus.INTERNAL_SERVER_ERROR
-                )
-        
-        elif self.path == '/repositories':
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length == 0:
-                self.send_json_response(
-                    {"error": "Empty request body"}, 
-                    HTTPStatus.BAD_REQUEST
-                )
-                return
 
-            try:
-                # Parse request body
-                body = self.rfile.read(content_length)
-                repo_data = json.loads(body)
-                
-                # Validate required fields
-                if 'name' not in repo_data or 'url' not in repo_data:
+                try:
+                    # Parse request body
+                    body = self.rfile.read(content_length)
+                    print(f"Received message body: {body.decode()}")
+                    message_data = json.loads(body)
+                    
+                    # Validate required fields
+                    if 'content' not in message_data:
+                        self.send_json_response(
+                            {"error": "Message content is required"}, 
+                            HTTPStatus.BAD_REQUEST
+                        )
+                        return
+                    
+                    # Get message details
+                    content = message_data['content']
+                    timestamp = message_data.get('timestamp', datetime.utcnow().isoformat())
+                    author = message_data.get('author', 'Anonymous')
+                    
+                    print(f"Processing message: content={content}, timestamp={timestamp}, author={author}")
+                    
+                    # Save to database
+                    repository_id = self.db_manager.add_repository(
+                        name=message_data.get('repository_name', 'Default Repository'),
+                        url=message_data.get('repository_url', 'local')
+                    )
+                    
+                    print(f"Created/found repository with ID: {repository_id}")
+                    
+                    message_id = self.db_manager.save_message(
+                        repository_id=repository_id,
+                        content=content,
+                        timestamp=timestamp,
+                        author=author
+                    )
+                    
+                    print(f"Saved message with ID: {message_id}")
+                    
+                    self.send_json_response({
+                        "message": "Message saved successfully",
+                        "id": message_id
+                    })
+                    
+                except json.JSONDecodeError as e:
+                    print(f"JSON decode error: {str(e)}")
                     self.send_json_response(
-                        {"error": "Repository name and URL are required"}, 
+                        {"error": "Invalid JSON"}, 
                         HTTPStatus.BAD_REQUEST
                     )
-                    return
-                
-                # Add repository
-                repo_id = self.db_manager.add_repository(
-                    name=repo_data['name'],
-                    url=repo_data['url']
-                )
-                
-                self.send_json_response({
-                    "message": "Repository added successfully",
-                    "id": repo_id
-                })
-                
-            except json.JSONDecodeError:
-                self.send_json_response(
-                    {"error": "Invalid JSON"}, 
-                    HTTPStatus.BAD_REQUEST
-                )
-            except Exception as e:
-                print(f"Error adding repository: {str(e)}")
-                self.send_json_response(
-                    {"error": "Failed to add repository"}, 
-                    HTTPStatus.INTERNAL_SERVER_ERROR
-                )
-        else:
-            self.send_error(HTTPStatus.NOT_FOUND, "Endpoint not found")
+                except Exception as e:
+                    print(f"Error saving message: {str(e)}")
+                    print(f"Traceback: {traceback.format_exc()}")
+                    self.send_json_response(
+                        {"error": "Failed to save message"}, 
+                        HTTPStatus.INTERNAL_SERVER_ERROR
+                    )
+        except Exception as e:
+            print(f"Unhandled error in do_POST: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            self.send_json_response(
+                {"error": "Internal server error"}, 
+                HTTPStatus.INTERNAL_SERVER_ERROR
+            )
 
     def serve_file(self, filepath: str, content_type: str) -> None:
         """Serve a file with the specified content type."""
