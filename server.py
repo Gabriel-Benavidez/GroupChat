@@ -17,146 +17,98 @@ from typing import Dict, Any, List, Optional, Tuple
 from github_manager import GitHubManager
 
 class DatabaseManager:
-    """Manages SQLite database operations for multiple repositories."""
-    
     def __init__(self, db_path: str = "database/messages.db"):
-        """Initialize database connection."""
         self.db_path = db_path
         print(f"Initializing DatabaseManager with path: {db_path}")
         self._init_database()
         self.github = GitHubManager()
-        self._start_sync_thread()
         
     def _init_database(self) -> None:
         """Initialize the database with the schema."""
         try:
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             with self.get_connection() as conn:
-                # Read and execute schema
-                schema_path = Path("database/schema_v2.sql")
-                with open(schema_path) as f:
-                    conn.executescript(f.read())
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS repositories (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        url TEXT NOT NULL,
+                        last_synced TEXT,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(url)
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        repository_id INTEGER NOT NULL,
+                        content TEXT NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        author TEXT,
+                        url TEXT,
+                        message_type TEXT,
+                        parent_title TEXT,
+                        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (repository_id) REFERENCES repositories(id)
+                    )
+                """)
                 conn.commit()
-                
-                # Test connection and print info
-                cursor = conn.cursor()
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-                tables = cursor.fetchall()
-                print(f"Found tables in database: {tables}")
+                print("Database initialized successfully")
         except Exception as e:
             print(f"Error initializing database: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
             raise
-    
-    def _start_sync_thread(self) -> None:
-        """Start background thread for repository synchronization."""
-        self.sync_thread = threading.Thread(target=self._sync_repositories_periodically, daemon=True)
-        self.sync_thread.start()
-    
-    def _sync_repositories_periodically(self) -> None:
-        """Periodically sync all active repositories."""
-        while True:
-            try:
-                repositories = self.get_repositories(active_only=True)
-                for repo in repositories:
-                    try:
-                        self.sync_repository(repo['id'])
-                    except Exception as e:
-                        print(f"Error syncing repository {repo['url']}: {str(e)}")
-            except Exception as e:
-                print(f"Error in sync thread: {str(e)}")
-            
-            # Sleep for 5 minutes before next sync
-            time.sleep(300)
-    
-    def sync_repository(self, repo_id: int) -> None:
-        """
-        Sync messages from a GitHub repository.
-        
-        Args:
-            repo_id: Repository ID to sync
-        """
-        with self.get_connection() as conn:
-            # Get repository info
-            cursor = conn.execute("SELECT * FROM repositories WHERE id = ?", (repo_id,))
-            repo = cursor.fetchone()
-            if not repo:
-                raise ValueError(f"Repository {repo_id} not found")
-            
-            # Get last sync time
-            last_synced = repo['last_synced']
-            
-            try:
-                # Fetch messages from GitHub
-                messages = self.github.get_all_repository_messages(repo['url'], since=last_synced)
-                
-                # Save new messages
-                for msg in messages:
-                    cursor.execute("""
-                        INSERT INTO messages 
-                        (repository_id, content, timestamp, author, url, message_type, parent_title)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        repo_id,
-                        msg['content'],
-                        msg['timestamp'],
-                        msg['author'],
-                        msg['url'],
-                        msg['type'],
-                        msg.get('parent_title')
-                    ))
-                
-                # Update last sync time
-                cursor.execute("""
-                    UPDATE repositories 
-                    SET last_synced = ? 
-                    WHERE id = ?
-                """, (datetime.now(timezone.utc).isoformat(), repo_id))
-                
-                conn.commit()
-                print(f"Successfully synced {len(messages)} messages from {repo['url']}")
-                
-            except Exception as e:
-                print(f"Error syncing repository {repo['url']}: {str(e)}")
-                raise
 
     def get_connection(self):
         """Get a database connection."""
         try:
-            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             return conn
         except Exception as e:
             print(f"Error connecting to database: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
             raise
 
     def add_repository(self, name: str, url: str) -> int:
-        """
-        Add a new repository to track.
-        
-        Returns:
-            Repository ID
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT OR IGNORE INTO repositories (name, url)
-                VALUES (?, ?)
-            """, (name, url))
-            
-            if cursor.rowcount == 0:  # Repository already exists
-                cursor.execute("SELECT id FROM repositories WHERE url = ?", (url,))
-                return cursor.fetchone()['id']
-            
-            repo_id = cursor.lastrowid
-            
-            # Start initial sync in background
-            threading.Thread(
-                target=self.sync_repository,
-                args=(repo_id,),
-                daemon=True
-            ).start()
-            
-            return repo_id
+        """Add a new repository to track."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(
+                    "INSERT OR IGNORE INTO repositories (name, url) VALUES (?, ?)",
+                    (name, url)
+                )
+                conn.commit()
+                
+                if cursor.rowcount == 0:
+                    cursor = conn.execute(
+                        "SELECT id FROM repositories WHERE url = ?",
+                        (url,)
+                    )
+                    row = cursor.fetchone()
+                    return row['id']
+                return cursor.lastrowid
+        except Exception as e:
+            print(f"Error in add_repository: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            raise
+
+    def save_message(self, repository_id: int, content: str, timestamp: str, author: str) -> int:
+        """Save a new message to the database."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute("""
+                    INSERT INTO messages 
+                    (repository_id, content, timestamp, author, message_type)
+                    VALUES (?, ?, ?, ?, 'local')
+                """, (repository_id, content, timestamp, author))
+                conn.commit()
+                return cursor.lastrowid
+        except Exception as e:
+            print(f"Error in save_message: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            raise
 
     def get_repositories(self, active_only: bool = True) -> List[Dict]:
         """Get list of tracked repositories."""
@@ -235,22 +187,6 @@ class DatabaseManager:
             
             cursor = conn.execute(query, params)
             return cursor.fetchone()['count']
-
-    def save_message(self, repository_id: int, content: str, timestamp: str, author: str) -> int:
-        """Save a new message to the database."""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.execute("""
-                    INSERT INTO messages 
-                    (repository_id, content, timestamp, author, message_type)
-                    VALUES (?, ?, ?, ?, 'local')
-                """, (repository_id, content, timestamp, author))
-                conn.commit()
-                return cursor.lastrowid
-        except Exception as e:
-            print(f"Error in save_message: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
-            raise
 
 class MessageHandler(http.server.SimpleHTTPRequestHandler):
     """Custom HTTP request handler for the messaging application."""
