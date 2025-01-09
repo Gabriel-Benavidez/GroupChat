@@ -119,12 +119,21 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                 
                 try:
                     filepath = self.message_manager.save_message(message, author)
+                    print(f"Message saved to: {filepath}")
+                    
+                    # Add and commit the new message file immediately
+                    repo_dir = os.path.dirname(os.path.abspath(__file__))
+                    subprocess.run(['git', 'add', filepath], cwd=repo_dir, check=True)
+                    commit_message = f"Add message from {author}"
+                    subprocess.run(['git', 'commit', '-m', commit_message], cwd=repo_dir, check=True)
+                    
                     self.send_json_response({
                         'status': 'success',
                         'message': 'Message saved successfully',
                         'filepath': filepath
                     })
                 except Exception as e:
+                    print(f"Error saving message: {str(e)}")
                     self.send_json_response({
                         'status': 'error',
                         'message': f'Failed to save message: {str(e)}'
@@ -132,40 +141,29 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
             
             elif self.path == '/push_to_github':
                 try:
-                    # Add all files in message_storage
-                    subprocess.run(['git', 'add', 'message_storage/*.txt'], 
-                                cwd=os.path.dirname(os.path.abspath(__file__)),
-                                check=True)
+                    repo_dir = os.path.dirname(os.path.abspath(__file__))
                     
-                    # Check if there are changes to commit
-                    result = subprocess.run(['git', 'status', '--porcelain'],
-                                         cwd=os.path.dirname(os.path.abspath(__file__)),
-                                         capture_output=True,
-                                         text=True,
-                                         check=True)
-                    
-                    if result.stdout.strip():
-                        # Commit the changes
-                        commit_message = f"Add new messages - {datetime.now(timezone.utc).isoformat()}"
-                        subprocess.run(['git', 'commit', '-m', commit_message],
-                                    cwd=os.path.dirname(os.path.abspath(__file__)),
-                                    check=True)
-                        
-                        # Push to GitHub
-                        subprocess.run(['git', 'push', 'origin', 'main'],
-                                    cwd=os.path.dirname(os.path.abspath(__file__)),
-                                    check=True)
+                    # Try to push to GitHub
+                    try:
+                        subprocess.run(['git', 'push', 'origin', 'main'], 
+                                    cwd=repo_dir,
+                                    check=True,
+                                    capture_output=True,
+                                    text=True)
                         
                         self.send_json_response({
                             'status': 'success',
                             'message': 'Messages successfully pushed to GitHub'
                         })
-                    else:
+                    except subprocess.CalledProcessError as e:
+                        print(f"Git push error: {e.stderr}")
                         self.send_json_response({
-                            'status': 'success',
-                            'message': 'No new messages to push'
-                        })
-                except subprocess.CalledProcessError as e:
+                            'status': 'error',
+                            'message': f'Failed to push to GitHub: {e.stderr}'
+                        }, HTTPStatus.INTERNAL_SERVER_ERROR)
+                        
+                except Exception as e:
+                    print(f"Error in push_to_github: {str(e)}")
                     self.send_json_response({
                         'status': 'error',
                         'message': f'Failed to push to GitHub: {str(e)}'
@@ -182,6 +180,7 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                     }, HTTPStatus.INTERNAL_SERVER_ERROR)
         
         except Exception as e:
+            print(f"Server error: {str(e)}")
             self.send_json_response({
                 'status': 'error',
                 'message': f'Server error: {str(e)}'
