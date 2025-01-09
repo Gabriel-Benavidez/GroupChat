@@ -315,49 +315,8 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """Handle POST requests."""
-        parsed_path = urllib.parse.urlparse(self.path)
-        
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length).decode('utf-8')
-            data = json.loads(body) if body else {}
-            
-            if parsed_path.path == '/messages':
-                print("Handling /messages POST request...")
-                try:
-                    # Save message to database
-                    content = data.get('content', '').strip()
-                    author = data.get('author', 'Anonymous')
-                    timestamp = datetime.now(timezone.utc).astimezone().isoformat()
-                    
-                    # Save to messages folder
-                    messages_dir = os.path.join(os.path.dirname(__file__), "messages")
-                    os.makedirs(messages_dir, exist_ok=True)
-                    
-                    message_file = os.path.join(messages_dir, f"{timestamp.replace(':', '-')}_{author}.json")
-                    with open(message_file, 'w') as f:
-                        json.dump({
-                            "content": content,
-                            "author": author,
-                            "timestamp": timestamp,
-                            "type": "message"
-                        }, f, indent=4)
-                    
-                    # Save to database
-                    self.db_manager.save_message(1, content, timestamp, author)
-                    
-                    self.send_json_response({
-                        "status": "success",
-                        "message": "Message saved successfully"
-                    })
-                    
-                except Exception as e:
-                    print(f"Error saving message: {str(e)}")
-                    self.send_json_response(
-                        {"error": "Failed to save message"}, 
-                        HTTPStatus.INTERNAL_SERVER_ERROR
-                    )
-            elif parsed_path.path == '/push':
+            if self.path == '/push':
                 try:
                     result = subprocess.run(['./push.py'], capture_output=True, text=True)
                     if result.returncode == 0:
@@ -377,7 +336,7 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                     }, HTTPStatus.INTERNAL_SERVER_ERROR)
                 return
             
-            elif parsed_path.path == '/messages':
+            elif self.path == '/messages':
                 content_length = int(self.headers.get('Content-Length', 0))
                 if content_length == 0:
                     self.send_json_response(
