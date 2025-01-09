@@ -15,9 +15,11 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
 class MessageManager:
-    def __init__(self, messages_dir: str = "messages"):
+    def __init__(self, messages_dir: str = "message_storage"):
+        """Initialize the message manager with a dedicated storage directory."""
         self.messages_dir = messages_dir
         os.makedirs(messages_dir, exist_ok=True)
+        print(f"Message storage initialized at: {os.path.abspath(messages_dir)}")
     
     def save_message(self, content: str, author: str) -> str:
         timestamp = datetime.now(timezone.utc).isoformat()
