@@ -15,7 +15,6 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from github_manager import GitHubManager
-from git_manager import GitManager
 
 class DatabaseManager:
     def __init__(self, db_path: str = "database/messages.db"):
@@ -195,7 +194,6 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         # Initialize database and git managers
         self.db_manager = DatabaseManager()
-        self.git_manager = GitManager()
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:
@@ -383,14 +381,7 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                         author=author
                     )
                     
-                    # Save message to file and push to Git
-                    filepath = self.git_manager.create_message_file(content=content, author=author)
-                    commit_hash = self.git_manager.push_message(
-                        filepath=filepath,
-                        commit_message=f"Add message from {author}"
-                    )
-                    
-                    print(f"Saved message with ID: {message_id} and commit hash: {commit_hash}")
+                    print(f"Saved message with ID: {message_id}")
                     
                     self.send_json_response({
                         "message": "Message saved successfully",
