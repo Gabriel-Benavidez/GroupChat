@@ -27,8 +27,9 @@ class GitManager:
         self.github_username = github_username
         self.github_repo = github_repo
             
-        # Store messages in the repository root
-        self.messages_dir = repo_path
+        # Create messages directory if it doesn't exist
+        self.messages_dir = os.path.join(repo_path, "messages")
+        Path(self.messages_dir).mkdir(parents=True, exist_ok=True)
 
     def create_message_file(self, content: str, author: str) -> str:
         """
