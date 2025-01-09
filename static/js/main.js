@@ -36,9 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (result.status === 'success') {
                 messageInput.value = '';
                 loadMessages();
+            } else {
+                alert('Error: ' + result.message);
             }
         } catch (error) {
             console.error('Error sending message:', error);
+            alert('Error sending message. Check console for details.');
         }
     });
 
@@ -85,6 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } catch (error) {
             console.error('Error loading messages:', error);
+            messagesContainer.innerHTML = '<p>Error loading messages</p>';
         }
     }
 

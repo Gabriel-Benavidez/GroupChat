@@ -22,33 +22,42 @@ class MessageManager:
         print(f"Message storage initialized at: {os.path.abspath(messages_dir)}")
     
     def save_message(self, content: str, author: str) -> str:
+        """Save a message to a text file."""
         timestamp = datetime.now(timezone.utc).isoformat()
         filename = f"{timestamp.replace(':', '-')}_{author}.txt"
         filepath = os.path.join(self.messages_dir, filename)
         
-        with open(filepath, 'w') as f:
-            f.write(f"Author: {author}\nTimestamp: {timestamp}\n\n{content}")
-        
-        return filepath
+        try:
+            with open(filepath, 'w') as f:
+                f.write(f"Author: {author}\nTimestamp: {timestamp}\n\n{content}")
+            print(f"Message saved to: {filepath}")
+            return filepath
+        except Exception as e:
+            print(f"Error saving message: {str(e)}")
+            raise
     
     def get_messages(self) -> List[Dict[str, Any]]:
+        """Get all messages from the storage directory."""
         messages = []
-        for filename in sorted(os.listdir(self.messages_dir)):
-            if filename.endswith('.txt'):
-                filepath = os.path.join(self.messages_dir, filename)
-                with open(filepath, 'r') as f:
-                    content = f.read()
-                    # Parse the content
-                    lines = content.split('\n')
-                    author = lines[0].replace('Author: ', '')
-                    timestamp = lines[1].replace('Timestamp: ', '')
-                    message_content = '\n'.join(lines[3:])
-                    messages.append({
-                        'author': author,
-                        'timestamp': timestamp,
-                        'content': message_content,
-                        'filename': filename
-                    })
+        if os.path.exists(self.messages_dir):
+            for filename in sorted(os.listdir(self.messages_dir)):
+                if filename.endswith('.txt') and filename != '.gitkeep':
+                    filepath = os.path.join(self.messages_dir, filename)
+                    try:
+                        with open(filepath, 'r') as f:
+                            content = f.read()
+                            lines = content.split('\n')
+                            author = lines[0].replace('Author: ', '')
+                            timestamp = lines[1].replace('Timestamp: ', '')
+                            message_content = '\n'.join(lines[3:])
+                            messages.append({
+                                'author': author,
+                                'timestamp': timestamp,
+                                'content': message_content,
+                                'filename': filename
+                            })
+                    except Exception as e:
+                        print(f"Error reading message {filename}: {str(e)}")
         return messages
 
 class MessageHandler(http.server.SimpleHTTPRequestHandler):
@@ -90,22 +99,37 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """Handle POST requests."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        
         try:
-            if self.path == '/send_message':
-                content_length = int(self.headers['Content-Length'])
+            if content_length > 0:
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data.decode('utf-8'))
+            
+            if self.path == '/send_message':
+                message = data.get('message', '').strip()
+                author = data.get('author', 'Anonymous').strip()
                 
-                message = data.get('message', '')
-                author = data.get('author', 'Anonymous')
+                if not message:
+                    self.send_json_response({
+                        'status': 'error',
+                        'message': 'Message content is required'
+                    }, HTTPStatus.BAD_REQUEST)
+                    return
                 
-                filepath = self.message_manager.save_message(message, author)
-                
-                self.send_json_response({
-                    'status': 'success',
-                    'message': 'Message saved successfully',
-                    'filepath': filepath
-                })
+                try:
+                    filepath = self.message_manager.save_message(message, author)
+                    self.send_json_response({
+                        'status': 'success',
+                        'message': 'Message saved successfully',
+                        'filepath': filepath
+                    })
+                except Exception as e:
+                    self.send_json_response({
+                        'status': 'error',
+                        'message': f'Failed to save message: {str(e)}'
+                    }, HTTPStatus.INTERNAL_SERVER_ERROR)
+            
             elif self.path == '/push_to_github':
                 try:
                     # Add all files in message_storage
@@ -113,39 +137,56 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                                 cwd=os.path.dirname(os.path.abspath(__file__)),
                                 check=True)
                     
-                    # Commit the changes
-                    commit_message = f"Add new messages - {datetime.now(timezone.utc).isoformat()}"
-                    subprocess.run(['git', 'commit', '-m', commit_message],
-                                cwd=os.path.dirname(os.path.abspath(__file__)),
-                                check=True)
+                    # Check if there are changes to commit
+                    result = subprocess.run(['git', 'status', '--porcelain'],
+                                         cwd=os.path.dirname(os.path.abspath(__file__)),
+                                         capture_output=True,
+                                         text=True,
+                                         check=True)
                     
-                    # Push to GitHub
-                    subprocess.run(['git', 'push', 'origin', 'main'],
-                                cwd=os.path.dirname(os.path.abspath(__file__)),
-                                check=True)
-                    
-                    self.send_json_response({
-                        'status': 'success',
-                        'message': 'Messages successfully pushed to GitHub'
-                    })
+                    if result.stdout.strip():
+                        # Commit the changes
+                        commit_message = f"Add new messages - {datetime.now(timezone.utc).isoformat()}"
+                        subprocess.run(['git', 'commit', '-m', commit_message],
+                                    cwd=os.path.dirname(os.path.abspath(__file__)),
+                                    check=True)
+                        
+                        # Push to GitHub
+                        subprocess.run(['git', 'push', 'origin', 'main'],
+                                    cwd=os.path.dirname(os.path.abspath(__file__)),
+                                    check=True)
+                        
+                        self.send_json_response({
+                            'status': 'success',
+                            'message': 'Messages successfully pushed to GitHub'
+                        })
+                    else:
+                        self.send_json_response({
+                            'status': 'success',
+                            'message': 'No new messages to push'
+                        })
                 except subprocess.CalledProcessError as e:
                     self.send_json_response({
                         'status': 'error',
                         'message': f'Failed to push to GitHub: {str(e)}'
                     }, HTTPStatus.INTERNAL_SERVER_ERROR)
+            
             elif self.path == '/get_messages':
-                messages = self.message_manager.get_messages()
-                self.send_json_response({
-                    'messages': messages
-                })
+                try:
+                    messages = self.message_manager.get_messages()
+                    self.send_json_response({'messages': messages})
+                except Exception as e:
+                    self.send_json_response({
+                        'status': 'error',
+                        'message': f'Failed to get messages: {str(e)}'
+                    }, HTTPStatus.INTERNAL_SERVER_ERROR)
+        
         except Exception as e:
-            print(f"Unhandled error in do_POST: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
-            self.send_json_response(
-                {"error": "Internal server error"}, 
-                HTTPStatus.INTERNAL_SERVER_ERROR
-            )
-
+            self.send_json_response({
+                'status': 'error',
+                'message': f'Server error: {str(e)}'
+            }, HTTPStatus.INTERNAL_SERVER_ERROR)
+    
     def serve_file(self, filepath: str, content_type: str) -> None:
         """Serve a file with the specified content type."""
         try:
@@ -175,20 +216,10 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
 
     def send_json_response(self, data: Dict[str, Any], status: int = HTTPStatus.OK) -> None:
         """Send a JSON response with the specified data and status code."""
-        try:
-            response = json.dumps(data).encode('utf-8')
-            self.send_response(status)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Content-Length', len(response))
-            self.send_header('Access-Control-Allow-Origin', '*')  # Allow CORS
-            self.end_headers()
-            self.wfile.write(response)
-        except Exception as e:
-            print(f"Error in send_json_response: {str(e)}")
-            print(f"Data being sent: {data}")
-            import traceback
-            traceback.print_exc()
-            raise
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode())
 
 def run_server(port: int = 8888) -> None:
     """
