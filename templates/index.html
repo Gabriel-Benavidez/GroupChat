@@ -158,6 +158,13 @@
     </div>
 
     <form id="messageForm">
+        <input 
+            type="text" 
+            id="authorName" 
+            placeholder="Your name..."
+            maxlength="50"
+            style="width: 100%; padding: 12px; margin: 10px 0; border: 2px solid var(--border-color); border-radius: 6px; font-size: 1em;"
+        />
         <textarea 
             id="messageContent" 
             rows="4" 
@@ -187,6 +194,8 @@
             if (isSubmitting) return;
             
             const content = messageContent.value.trim();
+            const author = document.getElementById('authorName').value.trim() || 'Anonymous';
+            
             if (!content) {
                 showError('Please enter a message');
                 return;
@@ -200,11 +209,11 @@
                 const response = await fetch('/messages', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         content,
-                        timestamp: new Date().toISOString()
+                        author
                     })
                 });
                 
@@ -252,7 +261,7 @@
                 messagesDiv.innerHTML = messages.map(msg => `
                     <div class="message">
                         <p>${escapeHtml(msg.content)}</p>
-                        <small>${formatDate(msg.timestamp)}</small>
+                        <small>By ${escapeHtml(msg.author)} on ${formatDate(msg.timestamp)}</small>
                     </div>
                 `).join('');
 
