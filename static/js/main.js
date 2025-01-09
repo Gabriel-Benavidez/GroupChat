@@ -46,7 +46,10 @@ document.addEventListener('DOMContentLoaded', function() {
     pushButton.addEventListener('click', async function() {
         try {
             const response = await fetch('/push_to_github', {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
             
             const result = await response.json();
