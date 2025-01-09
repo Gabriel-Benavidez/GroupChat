@@ -106,6 +106,33 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                     'message': 'Message saved successfully',
                     'filepath': filepath
                 })
+            elif self.path == '/push_to_github':
+                try:
+                    # Add all files in message_storage
+                    subprocess.run(['git', 'add', 'message_storage/*.txt'], 
+                                cwd=os.path.dirname(os.path.abspath(__file__)),
+                                check=True)
+                    
+                    # Commit the changes
+                    commit_message = f"Add new messages - {datetime.now(timezone.utc).isoformat()}"
+                    subprocess.run(['git', 'commit', '-m', commit_message],
+                                cwd=os.path.dirname(os.path.abspath(__file__)),
+                                check=True)
+                    
+                    # Push to GitHub
+                    subprocess.run(['git', 'push', 'origin', 'main'],
+                                cwd=os.path.dirname(os.path.abspath(__file__)),
+                                check=True)
+                    
+                    self.send_json_response({
+                        'status': 'success',
+                        'message': 'Messages successfully pushed to GitHub'
+                    })
+                except subprocess.CalledProcessError as e:
+                    self.send_json_response({
+                        'status': 'error',
+                        'message': f'Failed to push to GitHub: {str(e)}'
+                    }, HTTPStatus.INTERNAL_SERVER_ERROR)
             elif self.path == '/get_messages':
                 messages = self.message_manager.get_messages()
                 self.send_json_response({
