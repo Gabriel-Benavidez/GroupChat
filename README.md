@@ -65,7 +65,7 @@ python init_db_v2.py
 python server.py
 ```
 
-Visit `http://127.0.0.1:8888` in your browser.
+Visit `http://localhost:8888` in your browser.
 
 ## Note
 - Never commit your `.env` file
