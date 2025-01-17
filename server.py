@@ -53,11 +53,16 @@ class DatabaseManager:
                         FOREIGN KEY (repository_id) REFERENCES repositories(id)
                     )
                 """)
+                
+                # Add default repository if it doesn't exist
+                conn.execute("""
+                    INSERT OR IGNORE INTO repositories (id, name, url) 
+                    VALUES (1, 'default', 'default')
+                """)
                 conn.commit()
                 print("Database initialized successfully")
         except Exception as e:
             print(f"Error initializing database: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
             raise
 
     def get_connection(self):
@@ -97,6 +102,7 @@ class DatabaseManager:
     def save_message(self, repository_id: int, content: str, timestamp: str, author: str) -> int:
         """Save a new message to the database."""
         try:
+            print(f"Attempting to save message: repo_id={repository_id}, content={content}, author={author}")
             with self.get_connection() as conn:
                 cursor = conn.execute("""
                     INSERT INTO messages 
@@ -104,6 +110,7 @@ class DatabaseManager:
                     VALUES (?, ?, ?, ?, 'local')
                 """, (repository_id, content, timestamp, author))
                 conn.commit()
+                print(f"Successfully saved message with ID: {cursor.lastrowid}")
                 return cursor.lastrowid
         except Exception as e:
             print(f"Error in save_message: {str(e)}")
@@ -119,52 +126,40 @@ class DatabaseManager:
             cursor = conn.execute(query)
             return [dict(row) for row in cursor.fetchall()]
         
-    def get_messages(self, limit: Optional[int] = None, offset: int = 0, 
-                    sort_order: str = "DESC", repository_ids: Optional[List[int]] = None,
-                    message_types: Optional[List[str]] = None) -> List[Dict]:
-        """
-        Get messages from the database with filtering and pagination.
-        
-        Args:
-            limit: Maximum number of messages to return
-            offset: Number of messages to skip
-            sort_order: Sort order ("ASC" or "DESC")
-            repository_ids: Optional list of repository IDs to filter by
-            message_types: Optional list of message types to filter by
-            
-        Returns:
-            List of message dictionaries
-        """
-        with self.get_connection() as conn:
-            query = """
-                SELECT m.*, r.name as repository_name, r.url as repository_url
-                FROM messages m
-                JOIN repositories r ON m.repository_id = r.id
-                WHERE 1=1
-            """
-            
-            params = []
-            
-            if repository_ids:
-                query += " AND m.repository_id IN ({})".format(
-                    ','.join('?' * len(repository_ids))
-                )
-                params.extend(repository_ids)
-            
-            if message_types:
-                query += " AND m.message_type IN ({})".format(
-                    ','.join('?' * len(message_types))
-                )
-                params.extend(message_types)
-            
-            query += f" ORDER BY m.timestamp {sort_order}"
-            
-            if limit is not None:
-                query += " LIMIT ? OFFSET ?"
-                params.extend([limit, offset])
-            
-            cursor = conn.execute(query, params)
-            return [dict(row) for row in cursor.fetchall()]
+    def get_messages(self, limit: Optional[int] = None, offset: int = 0,
+                    sort_order: str = "DESC") -> List[Dict[str, Any]]:
+        """Get messages from the database."""
+        try:
+            print("Attempting to get messages from database...")
+            with self.get_connection() as conn:
+                query = """
+                    SELECT m.*, r.name as repository_name 
+                    FROM messages m
+                    JOIN repositories r ON m.repository_id = r.id
+                    ORDER BY m.timestamp {}
+                """.format(sort_order)
+                
+                if limit is not None:
+                    query += f" LIMIT {limit}"
+                if offset:
+                    query += f" OFFSET {offset}"
+                
+                print(f"Executing query: {query}")
+                cursor = conn.execute(query)
+                messages = []
+                for row in cursor:
+                    messages.append({
+                        'id': row['id'],
+                        'content': row['content'],
+                        'timestamp': row['timestamp'],
+                        'author': row['author'],
+                        'repository': row['repository_name']
+                    })
+                print(f"Found {len(messages)} messages")
+                return messages
+        except Exception as e:
+            print(f"Error getting messages: {str(e)}")
+            raise
 
     def get_message_count(self, repository_ids: Optional[List[int]] = None,
                          message_types: Optional[List[str]] = None) -> int:
@@ -198,209 +193,158 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         """Handle GET requests."""
-        parsed_path = urllib.parse.urlparse(self.path)
-        query_params = urllib.parse.parse_qs(parsed_path.query)
-        
-        if parsed_path.path == '/':
-            # Serve the main page
-            print("Serving main page...")
-            self.serve_file('templates/index.html', 'text/html')
+        try:
+            if self.path.startswith('/messages'):
+                messages = self.db_manager.get_messages(limit=50)
+                self.send_json_response(messages)
+                return
+            parsed_path = urllib.parse.urlparse(self.path)
+            query_params = urllib.parse.parse_qs(parsed_path.query)
             
-        elif parsed_path.path == '/repositories':
-            print("Handling /repositories request...")
-            try:
-                repositories = self.db_manager.get_repositories()
-                self.send_json_response({"repositories": repositories})
-            except Exception as e:
-                print(f"Error getting repositories: {str(e)}")
-                self.send_json_response(
-                    {"error": "Failed to get repositories"}, 
-                    HTTPStatus.INTERNAL_SERVER_ERROR
-                )
+            if parsed_path.path == '/':
+                # Serve the main page
+                print("Serving main page...")
+                self.serve_file('templates/index.html', 'text/html')
                 
-        elif parsed_path.path == '/messages':
-            print("Handling /messages request...")
-            try:
-                # Parse parameters
-                limit = int(query_params.get('limit', [20])[0])
-                offset = int(query_params.get('offset', [0])[0])
-                sort_order = query_params.get('sort', ['DESC'])[0]
-                
-                # Parse repository IDs if provided
-                repository_ids = None
-                if 'repositories' in query_params:
-                    try:
-                        repository_ids = [
-                            int(repo_id) 
-                            for repo_id in query_params['repositories'][0].split(',')
-                        ]
-                    except ValueError:
+            elif parsed_path.path == '/repositories':
+                print("Handling /repositories request...")
+                try:
+                    repositories = self.db_manager.get_repositories()
+                    self.send_json_response({"repositories": repositories})
+                except Exception as e:
+                    print(f"Error getting repositories: {str(e)}")
+                    self.send_json_response(
+                        {"error": "Failed to get repositories"}, 
+                        HTTPStatus.INTERNAL_SERVER_ERROR
+                    )
+                    
+            elif parsed_path.path == '/push':
+                print("Handling /push request...")
+                try:
+                    # Parse request body
+                    content_length = int(self.headers.get('Content-Length', 0))
+                    if content_length == 0:
                         self.send_json_response(
-                            {"error": "Invalid repository IDs"}, 
+                            {"error": "Empty request body"}, 
                             HTTPStatus.BAD_REQUEST
                         )
                         return
-                
-                # Parse message types if provided
-                message_types = None
-                if 'types' in query_params:
-                    message_types = query_params['types'][0].split(',')
-                
-                print(f"Fetching messages with limit={limit}, offset={offset}, "
-                      f"sort={sort_order}, repositories={repository_ids}, types={message_types}")
-                
-                # Get messages with pagination and repository filtering
-                messages = self.db_manager.get_messages(
-                    limit=limit,
-                    offset=offset,
-                    sort_order=sort_order,
-                    repository_ids=repository_ids,
-                    message_types=message_types
-                )
-                
-                # Get total message count
-                total_messages = self.db_manager.get_message_count(repository_ids, message_types)
-                
-                # Prepare response with pagination metadata
-                response = {
-                    "messages": messages,
-                    "pagination": {
-                        "total": total_messages,
-                        "offset": offset,
-                        "limit": limit,
-                        "has_more": (offset + limit) < total_messages
-                    }
-                }
-                
-                self.send_json_response(response)
-                
-            except Exception as e:
-                print(f"Error getting messages: {str(e)}")
-                self.send_json_response(
-                    {"error": "Failed to get messages"}, 
-                    HTTPStatus.INTERNAL_SERVER_ERROR
-                )
-        elif parsed_path.path == '/push':
-            print("Handling /push request...")
-            try:
-                # Parse request body
-                content_length = int(self.headers.get('Content-Length', 0))
-                if content_length == 0:
-                    self.send_json_response(
-                        {"error": "Empty request body"}, 
-                        HTTPStatus.BAD_REQUEST
-                    )
-                    return
 
-                body = self.rfile.read(content_length)
-                # Push to GitHub
-                success, error = self.db_manager.github.push()
-                if success:
-                    self.send_json_response({"status": "success", "message": "Successfully pushed to GitHub"})
-                else:
-                    self.send_json_response({"status": "error", "message": f"Failed to push: {error}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
-                
-            except Exception as e:
-                print(f"Error pushing to GitHub: {str(e)}")
-                self.send_json_response(
-                    {"error": "Failed to push to GitHub"}, 
-                    HTTPStatus.INTERNAL_SERVER_ERROR
-                )
-        else:
-            # Try to serve static files
-            try:
-                self.serve_static_file(parsed_path.path.lstrip('/'))
-            except FileNotFoundError:
-                self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+                    body = self.rfile.read(content_length)
+                    # Push to GitHub
+                    success, error = self.db_manager.github.push()
+                    if success:
+                        self.send_json_response({"status": "success", "message": "Successfully pushed to GitHub"})
+                    else:
+                        self.send_json_response({"status": "error", "message": f"Failed to push: {error}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+                    
+                except Exception as e:
+                    print(f"Error pushing to GitHub: {str(e)}")
+                    self.send_json_response(
+                        {"error": "Failed to push to GitHub"}, 
+                        HTTPStatus.INTERNAL_SERVER_ERROR
+                    )
+            else:
+                # Try to serve static files
+                try:
+                    self.serve_static_file(parsed_path.path.lstrip('/'))
+                except FileNotFoundError:
+                    self.send_error(HTTPStatus.NOT_FOUND, "File not found")
+
+        except Exception as e:
+            print(f"Error in do_GET: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            self.send_json_response(
+                {"error": "Internal server error"}, 
+                HTTPStatus.INTERNAL_SERVER_ERROR
+            )
 
     def do_POST(self) -> None:
         """Handle POST requests."""
         try:
-            if self.path == '/push':
-                try:
-                    result = subprocess.run(['./push.py'], capture_output=True, text=True)
-                    if result.returncode == 0:
-                        self.send_json_response({
-                            "status": "success",
-                            "message": result.stdout.strip() or "Successfully pushed changes"
-                        })
-                    else:
-                        self.send_json_response({
-                            "status": "error",
-                            "message": result.stderr.strip() or "Failed to push changes"
-                        }, HTTPStatus.INTERNAL_SERVER_ERROR)
-                except Exception as e:
-                    self.send_json_response({
-                        "status": "error",
-                        "message": str(e)
-                    }, HTTPStatus.INTERNAL_SERVER_ERROR)
-                return
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            print(f"Received POST data: {post_data.decode('utf-8')}")
+            data = json.loads(post_data.decode('utf-8'))
             
-            elif self.path == '/messages':
-                content_length = int(self.headers.get('Content-Length', 0))
-                if content_length == 0:
-                    self.send_json_response(
-                        {"error": "Empty request body"}, 
-                        HTTPStatus.BAD_REQUEST
-                    )
-                    return
-
+            if self.path == '/messages':
                 try:
-                    # Parse request body
-                    body = self.rfile.read(content_length)
-                    print(f"Received message body: {body.decode()}")
-                    message_data = json.loads(body)
-                    
                     # Validate required fields
-                    if 'content' not in message_data:
+                    if 'content' not in data:
                         self.send_json_response(
                             {"error": "Message content is required"}, 
                             HTTPStatus.BAD_REQUEST
                         )
                         return
                     
+                    content = data['content'].strip()
+                    if not content:
+                        self.send_json_response(
+                            {"error": "Message content cannot be empty"}, 
+                            HTTPStatus.BAD_REQUEST
+                        )
+                        return
+                    
                     # Get message details
-                    content = message_data['content']
-                    timestamp = message_data.get('timestamp', datetime.utcnow().isoformat())
-                    author = message_data.get('author', 'Anonymous')
+                    timestamp = datetime.now(timezone.utc).isoformat()
+                    author = data.get('author', 'Anonymous')
                     
                     print(f"Processing message: content={content}, timestamp={timestamp}, author={author}")
                     
-                    # Save to database
-                    repository_id = self.db_manager.add_repository(
-                        name=message_data.get('repository_name', 'Default Repository'),
-                        url=message_data.get('repository_url', 'local')
-                    )
-                    
-                    print(f"Created/found repository with ID: {repository_id}")
-                    
+                    # Save to database with default repository (id=1)
                     message_id = self.db_manager.save_message(
-                        repository_id=repository_id,
+                        repository_id=1,
                         content=content,
                         timestamp=timestamp,
                         author=author
                     )
                     
-                    print(f"Saved message with ID: {message_id}")
+                    print(f"Successfully saved message with ID: {message_id}")
                     
+                    # Send success response with the message ID
                     self.send_json_response({
+                        "status": "success",
                         "message": "Message saved successfully",
                         "id": message_id
                     })
                     
-                except json.JSONDecodeError as e:
-                    print(f"JSON decode error: {str(e)}")
-                    self.send_json_response(
-                        {"error": "Invalid JSON"}, 
-                        HTTPStatus.BAD_REQUEST
-                    )
                 except Exception as e:
                     print(f"Error saving message: {str(e)}")
                     print(f"Traceback: {traceback.format_exc()}")
                     self.send_json_response(
-                        {"error": "Failed to save message"}, 
+                        {"error": f"Failed to save message: {str(e)}"}, 
                         HTTPStatus.INTERNAL_SERVER_ERROR
                     )
+                return
+            
+            elif self.path == '/push':
+                try:
+                    print("Attempting to push to GitHub...")
+                    result = subprocess.run(['git', 'add', '.'], capture_output=True, text=True, cwd=os.getcwd())
+                    if result.returncode != 0:
+                        raise Exception(f"Git add failed: {result.stderr}")
+                    
+                    result = subprocess.run(['git', 'commit', '-m', 'Update messages'], capture_output=True, text=True, cwd=os.getcwd())
+                    if result.returncode != 0 and "nothing to commit" not in result.stderr:
+                        raise Exception(f"Git commit failed: {result.stderr}")
+                    
+                    result = subprocess.run(['git', 'push'], capture_output=True, text=True, cwd=os.getcwd())
+                    if result.returncode != 0:
+                        raise Exception(f"Git push failed: {result.stderr}")
+                    
+                    print("Successfully pushed to GitHub")
+                    self.send_json_response({
+                        "status": "success",
+                        "message": "Successfully pushed to GitHub"
+                    })
+                except Exception as e:
+                    error_msg = str(e)
+                    print(f"Error pushing to GitHub: {error_msg}")
+                    self.send_json_response({
+                        "status": "error",
+                        "message": f"Failed to push: {error_msg}"
+                    }, HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
         except Exception as e:
             print(f"Unhandled error in do_POST: {str(e)}")
             print(f"Traceback: {traceback.format_exc()}")
@@ -453,36 +397,36 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
             traceback.print_exc()
             raise
 
-def run_server(port: int = 8888) -> None:
+def run_server(port: int = 8080) -> None:
     """
     Run the HTTP server on the specified port.
     
     Args:
         port: Port number to listen on
     """
-    retries = 3
-    while retries > 0:
-        try:
-            print(f"Starting server on port {port}...")
-            server = socketserver.TCPServer(("", port), MessageHandler)
-            server.allow_reuse_address = True
-            server.serve_forever()
-        except OSError as e:
-            if e.errno == 48:  # Address already in use
-                print(f"Port {port} is in use, trying again in 2 seconds...")
-                time.sleep(2)
-                retries -= 1
-                if retries == 0:
-                    port += 1
-                    retries = 3
-                    print(f"Trying port {port}...")
-            else:
-                raise
-        except KeyboardInterrupt:
-            print("\nShutting down server...")
-            server.shutdown()
-            server.server_close()
-            break
+    server = None
+    try:
+        print(f"Starting server on port {port}...")
+        server = socketserver.TCPServer(("", port), MessageHandler)
+        server.allow_reuse_address = True
+        print(f"Server is running at http://localhost:{port}")
+        server.serve_forever()
+    except OSError as e:
+        if e.errno == 48:  # Address already in use
+            print(f"Error: Port {port} is already in use. Please try a different port or restart the server.")
+        else:
+            print(f"Error starting server: {e}")
+    except KeyboardInterrupt:
+        print("\nShutting down server...")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+    finally:
+        if server:
+            try:
+                server.shutdown()
+                server.server_close()
+            except Exception:
+                pass
 
 if __name__ == "__main__":
-    run_server()
+    run_server(8081)
