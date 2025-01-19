@@ -14,29 +14,32 @@ A simple real-time chat application with local message storage and optional GitH
    cd GroupChat
    ```
 
-3. **Set up the app**:
+3. **Set up Python environment**:
    ```bash
    # Create a virtual environment
    python3 -m venv venv
 
-   # Activate it:
+   # Activate it (IMPORTANT - do this every time you run the app):
    # On Windows:
    venv\Scripts\activate
    # On Mac/Linux:
    source venv/bin/activate
 
-   # Install required packages
-   pip install -r requirements.txt
-
-   # Initialize the database
-   python3 init_db.py
+   # Install required packages (do this after activating venv):
+   pip3 install requests python-dotenv
    ```
 
    Note: If you see a message about updating to zsh shell, you can safely ignore it. This is a macOS system message about the default shell change from bash to zsh. It doesn't affect the application.
 
-4. **Start chatting**:
+4. **Initialize the database**:
    ```bash
-   # Start the server
+   # Make sure your virtual environment is activated first!
+   python3 init_db.py
+   ```
+
+5. **Start chatting**:
+   ```bash
+   # Make sure your virtual environment is activated first!
    python3 server.py
 
    # Open in your browser
@@ -64,6 +67,16 @@ If you want your messages to be backed up to GitHub:
    ```
 
 ## Troubleshooting
+
+- **"No module named 'requests'"**:
+  ```bash
+  # Make sure you've activated the virtual environment:
+  source venv/bin/activate  # On Mac/Linux
+  venv\Scripts\activate     # On Windows
+  
+  # Then install the packages:
+  pip3 install requests python-dotenv
+  ```
 
 - **"Python command not found"**:
   - Make sure Python is installed and added to PATH
