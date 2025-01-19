@@ -85,7 +85,33 @@ Just want to get chatting? Follow these simple steps:
    - Enter your username
    - Start chatting!
 
-That's it! The app is now running on your computer.
+That's it! The app is now running on your computer. Messages will be stored locally in the SQLite database.
+
+## Optional: GitHub Integration
+
+If you want your messages to be backed up to GitHub:
+
+1. Create a GitHub Personal Access Token:
+   - Go to GitHub Settings → Developer Settings → Personal Access Tokens
+   - Create a new token with 'repo' scope
+   - Copy the token
+
+2. Set up GitHub integration:
+   ```bash
+   # Copy the template file
+   cp .env.template .env
+   
+   # Edit .env and add your token:
+   GITHUB_TOKEN=your_token_here
+   ```
+
+3. Configure Git (if not already set):
+   ```bash
+   git config --global user.name "Your Name"
+   git config --global user.email "your.email@example.com"
+   ```
+
+The app will work perfectly fine without GitHub integration - your messages will still be saved locally.
 
 ## Troubleshooting Common Issues
 
@@ -104,6 +130,10 @@ That's it! The app is now running on your computer.
 - **"Database error"**:
   - Delete `database/messages.db`
   - Run `python3 init_db.py` again
+
+- **"GitHub-related errors"**:
+  - These can be safely ignored if you haven't set up GitHub integration
+  - Messages will still be saved locally
 
 For more detailed setup instructions and features, read on below.
 

@@ -21,12 +21,14 @@ class DatabaseManager:
         self.db_path = db_path
         print(f"Initializing DatabaseManager with path: {db_path}")
         self._init_database()
-        try:
-            self.github = GitHubManager()
-            self.github_enabled = True
-        except (ValueError, Exception) as e:
-            print(f"GitHub integration disabled: {str(e)}")
-            self.github_enabled = False
+        self.github_enabled = False
+        if os.getenv('GITHUB_TOKEN'):
+            try:
+                self.github = GitHubManager()
+                self.github_enabled = True
+                print("GitHub integration enabled")
+            except Exception as e:
+                print(f"GitHub integration disabled: {str(e)}")
         
     def _init_database(self) -> None:
         """Initialize the database with the schema."""
@@ -115,8 +117,8 @@ class DatabaseManager:
                 )
                 conn.commit()
 
-            # Only try to push to GitHub if it's enabled
-            if self.github_enabled:
+            # Only try to push to GitHub if it's enabled and configured
+            if self.github_enabled and hasattr(self, 'github'):
                 try:
                     self.push_to_github()
                 except Exception as e:
@@ -130,7 +132,7 @@ class DatabaseManager:
 
     def push_to_github(self):
         """Push messages.db to GitHub if enabled."""
-        if not self.github_enabled:
+        if not (self.github_enabled and hasattr(self, 'github')):
             print("GitHub integration is disabled - skipping push")
             return
             
