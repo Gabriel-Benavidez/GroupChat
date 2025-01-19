@@ -45,30 +45,83 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 
 ## Getting Started
 
+### Prerequisites
+1. Make sure you have Python 3.7+ installed:
+   ```bash
+   # On macOS
+   brew install python3
+   
+   # On Ubuntu/Debian
+   sudo apt-get update
+   sudo apt-get install python3 python3-pip
+   
+   # On Windows
+   # Download and install from https://www.python.org/downloads/
+   ```
+
+2. Verify Python installation:
+   ```bash
+   python3 --version
+   # Should show Python 3.7 or higher
+   ```
+
+### Installation
 1. Clone the repository:
    ```bash
    git clone https://github.com/Gabriel-Benavidez/GroupChat.git
    cd GroupChat
    ```
 
-2. Install dependencies:
+2. Create and activate a virtual environment (recommended):
    ```bash
-   pip install -r requirements.txt
+   # Create virtual environment
+   python3 -m venv venv
+   
+   # Activate virtual environment
+   # On macOS/Linux:
+   source venv/bin/activate
+   # On Windows:
+   .\venv\Scripts\activate
    ```
 
-3. Set up your environment variables:
-   - Copy `.env.template` to `.env`
-   - Add your GitHub token and repository details
-
-4. Run the server:
+3. Install dependencies:
    ```bash
-   python server.py
+   pip3 install -r requirements.txt
    ```
 
-5. Access the application:
+4. Initialize the database:
+   ```bash
+   python3 init_db.py
+   ```
+
+5. Set up your environment variables:
+   ```bash
+   # Copy the template file
+   cp .env.template .env
+   
+   # Edit .env file with your GitHub details
+   # Replace these values with your own:
+   GITHUB_TOKEN=your_token_here
+   GITHUB_USERNAME=your_username
+   GITHUB_REPO=your_repo_name
+   ```
+
+### Running the Application
+1. Start the server:
+   ```bash
+   python3 server.py
+   ```
+
+2. Access the application:
    - Open your browser to `http://localhost:8089`
    - Set your username using the styled button in the header
    - Start chatting!
+
+### Troubleshooting
+- If you see "command not found" errors, make sure Python is installed and in your PATH
+- If you get syntax errors, ensure you're using Python 3.7 or higher
+- If the database fails to initialize, check that you have write permissions in the directory
+- For any other issues, please check the GitHub issues page or create a new issue
 
 ## Usage Guide
 
