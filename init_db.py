@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.9
 import sqlite3
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 class DatabaseInitializer:
@@ -17,29 +18,42 @@ class DatabaseInitializer:
         self.schema_path = "database/schema.sql"
         
     def init_database(self) -> None:
-        """Create the database and initialize it with the schema."""
-        # Ensure database directory exists
-        db_dir = os.path.dirname(self.db_path)
-        Path(db_dir).mkdir(parents=True, exist_ok=True)
-        
-        # Connect to database (creates it if it doesn't exist)
-        with sqlite3.connect(self.db_path) as conn:
-            try:
-                # Read schema file
-                with open(self.schema_path, 'r') as f:
-                    schema = f.read()
+        """Initialize the database with the schema."""
+        try:
+            # Read schema
+            with open(self.schema_path, 'r') as f:
+                schema = f.read()
+
+            # Connect to database
+            with sqlite3.connect(self.db_path) as conn:
+                # Drop existing tables if they exist
+                conn.executescript("""
+                    DROP TABLE IF EXISTS messages;
+                    DROP TABLE IF EXISTS repositories;
+                """)
                 
-                # Execute schema
+                # Create fresh tables
                 conn.executescript(schema)
-                conn.commit()
-                print(f"Database initialized successfully at {self.db_path}")
                 
-            except sqlite3.Error as e:
-                print(f"Error initializing database: {e}")
-                raise
-            except FileNotFoundError:
-                print(f"Schema file not found at {self.schema_path}")
-                raise
+                # Insert default repository
+                conn.execute("""
+                    INSERT INTO repositories (name, url) 
+                    VALUES (?, ?)
+                """, ('Default Repository', 'local'))
+                
+                # Insert test message
+                timestamp = datetime.now(timezone.utc).isoformat()
+                conn.execute("""
+                    INSERT INTO messages (repository_id, content, timestamp, author, git_commit_hash)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (1, 'Welcome to GroupChat!', timestamp, 'System', None))
+                
+                conn.commit()
+                print("Database initialized successfully!")
+                
+        except Exception as e:
+            print(f"Error initializing database: {str(e)}")
+            raise
 
     def add_test_message(self) -> None:
         """Add a test message to verify the database is working."""
