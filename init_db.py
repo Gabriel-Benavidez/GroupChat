@@ -47,9 +47,9 @@ class DatabaseInitializer:
             try:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO messages (content, timestamp, author)
-                    VALUES (?, ?, ?)
-                """, ("Test message", "2025-01-07T15:33:47-05:00", "System"))
+                    INSERT INTO messages (content, timestamp, author, git_commit_hash)
+                    VALUES (?, ?, ?, ?)
+                """, ("Test message", "2025-01-07T15:33:47-05:00", "System", None))
                 conn.commit()
                 print("Test message added successfully")
             except sqlite3.Error as e:
