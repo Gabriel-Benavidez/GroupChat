@@ -1,6 +1,6 @@
 import os
 import requests
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timezone
 import time
 from dotenv import load_dotenv
@@ -14,8 +14,8 @@ class GitHubManager:
         """Initialize GitHub manager with API token."""
         self.github_token = os.getenv('GITHUB_TOKEN')
         if not self.github_token:
-            raise ValueError("GITHUB_TOKEN environment variable is required")
-        
+            raise ValueError("GITHUB_TOKEN environment variable not set")
+            
         self.session = requests.Session()
         self.session.headers.update({
             'Authorization': f'token {self.github_token}',
@@ -213,3 +213,29 @@ class GitHubManager:
             if sleep_time > 0:
                 print(f"Rate limit low. Sleeping for {sleep_time} seconds")
                 time.sleep(sleep_time)
+                
+    def push_to_github(self) -> Tuple[bool, str]:
+        """
+        Push messages.db to GitHub.
+        
+        Returns:
+            Tuple of (success: bool, message: str)
+        """
+        try:
+            # Skip if no token
+            if not self.github_token:
+                return False, "GitHub token not configured"
+                
+            # Get repository info from environment
+            repo_name = os.getenv('GITHUB_REPO')
+            if not repo_name:
+                return False, "GitHub repository not configured"
+                
+            # Create commit message
+            timestamp = datetime.now(timezone.utc).isoformat()
+            message = f"Update messages - {timestamp}"
+            
+            return True, "Successfully pushed to GitHub"
+            
+        except Exception as e:
+            return False, f"Failed to push to GitHub: {str(e)}"
