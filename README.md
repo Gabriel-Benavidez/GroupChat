@@ -81,7 +81,7 @@ Just want to get chatting? Follow these simple steps:
    ```
 
 5. **Open in your browser**:
-   - Go to: http://localhost:8089
+   - Go to: http://localhost:8090
    - Enter your username
    - Start chatting!
 
@@ -120,7 +120,7 @@ The app will work perfectly fine without GitHub integration - your messages will
   - Try using `python` instead of `python3`
 
 - **"Port already in use"**:
-  - Another program is using port 8089
+  - Another program is using port 8090
   - Close other applications or change the port in `server.py`
 
 - **"Module not found"**:
@@ -214,7 +214,7 @@ For more detailed setup instructions and features, read on below.
    ```
 
 2. Access the application:
-   - Open your browser to `http://localhost:8089`
+   - Open your browser to `http://localhost:8090`
    - Set your username using the styled button in the header
    - Start chatting!
 
