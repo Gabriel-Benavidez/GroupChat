@@ -47,13 +47,11 @@ class DatabaseManager:
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS messages (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        repository_id INTEGER NOT NULL,
+                        repository_id INTEGER DEFAULT 1,
                         content TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
                         author TEXT,
-                        url TEXT,
-                        message_type TEXT,
-                        parent_title TEXT,
+                        git_commit_hash TEXT,
                         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (repository_id) REFERENCES repositories(id)
                     )
@@ -104,16 +102,16 @@ class DatabaseManager:
             print(f"Traceback: {traceback.format_exc()}")
             raise
 
-    def save_message(self, repository_id: int, content: str, timestamp: str, author: str):
+    def save_message(self, content: str, timestamp: str, author: str) -> bool:
         """Save a new message to the database and optionally push to GitHub."""
         try:
             with self.get_connection() as conn:
                 cursor = conn.execute(
                     """
-                    INSERT INTO messages (repository_id, content, timestamp, author)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO messages (content, timestamp, author)
+                    VALUES (?, ?, ?)
                     """,
-                    (repository_id, content, timestamp, author)
+                    (content, timestamp, author)
                 )
                 conn.commit()
 
@@ -201,7 +199,7 @@ class DatabaseManager:
                     SELECT m.*, r.name as repository_name 
                     FROM messages m
                     JOIN repositories r ON m.repository_id = r.id
-                    ORDER BY m.timestamp {}
+                    ORDER BY m.created_at {}
                 """.format(sort_order)
                 
                 if limit is not None:
@@ -364,7 +362,6 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                 # Save message with author
                 timestamp = datetime.now(timezone.utc).isoformat()
                 self.db_manager.save_message(
-                    repository_id=1,  # Default repository
                     content=content,
                     timestamp=timestamp,
                     author=author
@@ -431,7 +428,6 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"Created/found repository with ID: {repository_id}")
                     
                     message_id = self.db_manager.save_message(
-                        repository_id=repository_id,
                         content=content,
                         timestamp=timestamp,
                         author=author
