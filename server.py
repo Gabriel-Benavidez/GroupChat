@@ -100,9 +100,8 @@ class DatabaseManager:
             raise
 
     def save_message(self, repository_id: int, content: str, timestamp: str, author: str) -> int:
-        """Save a new message to the database."""
+        """Save a new message to the database and push to GitHub."""
         try:
-            print(f"Attempting to save message: repo_id={repository_id}, content={content}, author={author}")
             with self.get_connection() as conn:
                 cursor = conn.execute("""
                     INSERT INTO messages 
@@ -110,12 +109,59 @@ class DatabaseManager:
                     VALUES (?, ?, ?, ?, 'local')
                 """, (repository_id, content, timestamp, author))
                 conn.commit()
-                print(f"Successfully saved message with ID: {cursor.lastrowid}")
-                return cursor.lastrowid
+                message_id = cursor.lastrowid
+                
+                # Push to GitHub
+                success, message = self.push_to_github()
+                if not success:
+                    print(f"Warning: Failed to push to GitHub: {message}")
+                
+                return message_id
         except Exception as e:
             print(f"Error in save_message: {str(e)}")
             print(f"Traceback: {traceback.format_exc()}")
             raise
+
+    def push_to_github(self):
+        """Push messages.db to GitHub"""
+        try:
+            repo_root = os.path.dirname(os.path.abspath(__file__))
+            print(f"Repository root: {repo_root}")
+            
+            # Add messages.db to git
+            db_path = os.path.join('database', 'messages.db')
+            subprocess.run(['git', 'add', db_path], check=True, cwd=repo_root)
+            
+            # Check if there are changes to commit
+            status = subprocess.run(['git', 'status', '--porcelain'], 
+                                 capture_output=True, text=True, cwd=repo_root)
+            
+            if not status.stdout.strip():
+                print("No changes to commit")
+                return True, "No changes to commit"
+            
+            # Create a commit with timestamp
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            commit_message = f'Update messages - {current_time}'
+            
+            # Commit changes
+            subprocess.run(['git', 'commit', '-m', commit_message], check=True, cwd=repo_root)
+            
+            # Push to GitHub
+            push_result = subprocess.run(['git', 'push', 'origin', 'main'], 
+                                      capture_output=True, text=True, check=True, cwd=repo_root)
+            
+            print("Successfully pushed to GitHub")
+            return True, "Successfully pushed to GitHub"
+            
+        except subprocess.CalledProcessError as e:
+            error_msg = f"Git operation failed: {e.stderr if hasattr(e, 'stderr') else str(e)}"
+            print(error_msg)
+            return False, error_msg
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            print(error_msg)
+            return False, error_msg
 
     def get_repositories(self, active_only: bool = True) -> List[Dict]:
         """Get list of tracked repositories."""
@@ -130,7 +176,6 @@ class DatabaseManager:
                     sort_order: str = "DESC") -> List[Dict[str, Any]]:
         """Get messages from the database."""
         try:
-            print("Attempting to get messages from database...")
             with self.get_connection() as conn:
                 query = """
                     SELECT m.*, r.name as repository_name 
@@ -144,7 +189,6 @@ class DatabaseManager:
                 if offset:
                     query += f" OFFSET {offset}"
                 
-                print(f"Executing query: {query}")
                 cursor = conn.execute(query)
                 messages = []
                 for row in cursor:
@@ -155,7 +199,6 @@ class DatabaseManager:
                         'author': row['author'],
                         'repository': row['repository_name']
                     })
-                print(f"Found {len(messages)} messages")
                 return messages
         except Exception as e:
             print(f"Error getting messages: {str(e)}")
@@ -244,6 +287,30 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                         {"error": "Failed to push to GitHub"}, 
                         HTTPStatus.INTERNAL_SERVER_ERROR
                     )
+            elif parsed_path.path == '/push-to-github':
+                print("Handling /push-to-github request...")
+                try:
+                    repo_root = os.path.dirname(os.path.abspath(__file__))
+                    print(f"Repository root: {repo_root}")
+                    
+                    # Add messages.db to git
+                    subprocess.run(['git', 'add', 'database/messages.db'], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                    
+                    # Create a commit with timestamp
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    commit_message = f'Update messages - {current_time}'
+                    subprocess.run(['git', 'commit', '-m', commit_message], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                    
+                    # Push to GitHub
+                    subprocess.run(['git', 'push', 'origin', 'main'], check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                    
+                    self.send_json_response({'success': True, 'message': 'Successfully pushed to GitHub'})
+                except subprocess.CalledProcessError as e:
+                    print(f"Git operation failed: {str(e)}")
+                    self.send_json_response({'success': False, 'message': f'Git operation failed: {str(e)}'}, status=500)
+                except Exception as e:
+                    print(f"Error: {str(e)}")
+                    self.send_json_response({'success': False, 'message': f'Error: {str(e)}'}, status=500)
             else:
                 # Try to serve static files
                 try:
@@ -264,87 +331,112 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
         try:
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
-            print(f"Received POST data: {post_data.decode('utf-8')}")
             data = json.loads(post_data.decode('utf-8'))
             
             if self.path == '/messages':
+                content = data.get('content', '').strip()
+                author = data.get('author', 'Anonymous')
+                
+                if not content:
+                    self.send_json_response({'error': 'Message content is required'}, HTTPStatus.BAD_REQUEST)
+                    return
+                
+                # Save message with author
+                timestamp = datetime.now(timezone.utc).isoformat()
+                self.db_manager.save_message(
+                    repository_id=1,  # Default repository
+                    content=content,
+                    timestamp=timestamp,
+                    author=author
+                )
+                
+                self.send_json_response({'status': 'success'})
+            
+            elif self.path == '/push':
                 try:
+                    result = subprocess.run(['./push.py'], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        self.send_json_response({
+                            "status": "success",
+                            "message": result.stdout.strip() or "Successfully pushed changes"
+                        })
+                    else:
+                        self.send_json_response({
+                            "status": "error",
+                            "message": result.stderr.strip() or "Failed to push changes"
+                        }, HTTPStatus.INTERNAL_SERVER_ERROR)
+                except Exception as e:
+                    self.send_json_response({
+                        "status": "error",
+                        "message": str(e)
+                    }, HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
+            
+            elif self.path == '/messages':
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length == 0:
+                    self.send_json_response(
+                        {"error": "Empty request body"}, 
+                        HTTPStatus.BAD_REQUEST
+                    )
+                    return
+
+                try:
+                    # Parse request body
+                    body = self.rfile.read(content_length)
+                    print(f"Received message body: {body.decode()}")
+                    message_data = json.loads(body)
+                    
                     # Validate required fields
-                    if 'content' not in data:
+                    if 'content' not in message_data:
                         self.send_json_response(
                             {"error": "Message content is required"}, 
                             HTTPStatus.BAD_REQUEST
                         )
                         return
                     
-                    content = data['content'].strip()
-                    if not content:
-                        self.send_json_response(
-                            {"error": "Message content cannot be empty"}, 
-                            HTTPStatus.BAD_REQUEST
-                        )
-                        return
-                    
                     # Get message details
-                    timestamp = datetime.now(timezone.utc).isoformat()
-                    author = data.get('author', 'Anonymous')
+                    content = message_data['content']
+                    timestamp = message_data.get('timestamp', datetime.utcnow().isoformat())
+                    author = message_data.get('author', 'Anonymous')
                     
                     print(f"Processing message: content={content}, timestamp={timestamp}, author={author}")
                     
-                    # Save to database with default repository (id=1)
+                    # Save to database
+                    repository_id = self.db_manager.add_repository(
+                        name=message_data.get('repository_name', 'Default Repository'),
+                        url=message_data.get('repository_url', 'local')
+                    )
+                    
+                    print(f"Created/found repository with ID: {repository_id}")
+                    
                     message_id = self.db_manager.save_message(
-                        repository_id=1,
+                        repository_id=repository_id,
                         content=content,
                         timestamp=timestamp,
                         author=author
                     )
                     
-                    print(f"Successfully saved message with ID: {message_id}")
+                    print(f"Saved message with ID: {message_id}")
                     
-                    # Send success response with the message ID
                     self.send_json_response({
-                        "status": "success",
                         "message": "Message saved successfully",
                         "id": message_id
                     })
                     
+                except json.JSONDecodeError as e:
+                    print(f"JSON decode error: {str(e)}")
+                    self.send_json_response(
+                        {"error": "Invalid JSON"}, 
+                        HTTPStatus.BAD_REQUEST
+                    )
                 except Exception as e:
                     print(f"Error saving message: {str(e)}")
                     print(f"Traceback: {traceback.format_exc()}")
                     self.send_json_response(
-                        {"error": f"Failed to save message: {str(e)}"}, 
+                        {"error": "Failed to save message"}, 
                         HTTPStatus.INTERNAL_SERVER_ERROR
                     )
-                return
-            
-            elif self.path == '/push':
-                try:
-                    print("Attempting to push to GitHub...")
-                    result = subprocess.run(['git', 'add', '.'], capture_output=True, text=True, cwd=os.getcwd())
-                    if result.returncode != 0:
-                        raise Exception(f"Git add failed: {result.stderr}")
-                    
-                    result = subprocess.run(['git', 'commit', '-m', 'Update messages'], capture_output=True, text=True, cwd=os.getcwd())
-                    if result.returncode != 0 and "nothing to commit" not in result.stderr:
-                        raise Exception(f"Git commit failed: {result.stderr}")
-                    
-                    result = subprocess.run(['git', 'push'], capture_output=True, text=True, cwd=os.getcwd())
-                    if result.returncode != 0:
-                        raise Exception(f"Git push failed: {result.stderr}")
-                    
-                    print("Successfully pushed to GitHub")
-                    self.send_json_response({
-                        "status": "success",
-                        "message": "Successfully pushed to GitHub"
-                    })
-                except Exception as e:
-                    error_msg = str(e)
-                    print(f"Error pushing to GitHub: {error_msg}")
-                    self.send_json_response({
-                        "status": "error",
-                        "message": f"Failed to push: {error_msg}"
-                    }, HTTPStatus.INTERNAL_SERVER_ERROR)
-                return
         except Exception as e:
             print(f"Unhandled error in do_POST: {str(e)}")
             print(f"Traceback: {traceback.format_exc()}")
@@ -397,7 +489,7 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
             traceback.print_exc()
             raise
 
-def run_server(port: int = 8080) -> None:
+def run_server(port: int = 8088) -> None:
     """
     Run the HTTP server on the specified port.
     
@@ -429,4 +521,4 @@ def run_server(port: int = 8080) -> None:
                 pass
 
 if __name__ == "__main__":
-    run_server(8081)
+    run_server()

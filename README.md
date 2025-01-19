@@ -1,116 +1,126 @@
-# Git-Backed Messaging Application
+# GroupChat
 
-A simple web-based messaging application that uses Git as a backend storage system. This application allows users to send and receive messages while maintaining a complete history of all communications using Git.
+A real-time group chat application with automatic GitHub backup, multi-user support, and rich interaction features.
 
 ## Features
 
-- Web-based messaging interface
-- Git-backed message storage
-- Message history with timestamps
-- Simple user authentication
-- Real-time message updates
-- SQLite database for user management
-- GitHub API integration for Git operations
+### Core Messaging
+- Real-time message sending and receiving
+- Clean, modern interface
+- Message history preservation
+- Automatic GitHub backup of all messages
+- Automatic timestamps on messages
 
-## Tech Stack
+### User Management
+- Customizable usernames
+- Username persistence across page refreshes
+- No login required - just set your name and start chatting
+- Username history tracking for reactions
 
-- Backend: Python (no frameworks)
-- Database: SQLite
-- Frontend: HTML, CSS, JavaScript (vanilla)
-- Version Control: Git
-- API: GitHub REST API
+### Rich Reactions System
+- Multiple emoji reactions per message
+- Support for multiple reactions from the same user
+- Reaction history preservation
+- Detailed reaction tooltips showing who reacted with what
+- Reaction counts for each emoji type
+- Available emojis: 👍 ❤️ 😊 🎉 👏 🚀 😢 😂 🤔
 
-## Project Structure
+### Data Storage & Backup
+- Automatic backup to GitHub after each message
+- Local storage for reactions and user preferences
+- SQLite database for message storage
+- Git-based version control for message history
 
-```
-.
-├── README.md
-├── .gitignore
-├── .env
-├── static/
-│   ├── css/
-│   │   └── style.css
-│   └── js/
-│       └── main.js
-├── templates/
-│   ├── index.html
-│   └── login.html
-├── database/
-│   └── schema.sql
-├── server.py
-└── requirements.txt
-```
+### User Interface
+- Modern, clean design
+- Responsive layout
+- Real-time updates
+- Loading indicators
+- Error notifications
+- Success confirmations
 
-## Important: Environment Setup Required
+## Getting Started
 
-Before running the application, you must set up your GitHub authentication:
-
-1. Get a GitHub token:
-   - Go to: https://github.com/settings/tokens
-   - Create new token with scopes: `repo`, `read:discussion`
-   - Copy your token
-
-2. Set up environment:
-```bash
-# Copy the template
-cp .env.template .env
-
-# Edit .env and replace your_github_token_here with your actual token
-```
-
-3. Install and run:
-```bash
-pip install -r requirements.txt
-python init_db_v2.py
-python server.py
-```
-
-Visit `http://localhost:8888` in your browser.
-
-## Note
-- Never commit your `.env` file
-- Keep your GitHub token secure
-- See API documentation below for usage
-
-## Setup Instructions
-
-1. Clone the repository
-2. Create a virtual environment:
+1. Clone the repository:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```bash
-   python3 -m pip install -r requirements.txt
-   ```
-4. Set up your GitHub credentials in `.env` file
-5. Initialize the SQLite database:
-   ```bash
-   python3 init_db.py
-   ```
-6. Run the server:
-   ```bash
-   python3 server.py
+   git clone https://github.com/Gabriel-Benavidez/GroupChat.git
+   cd GroupChat
    ```
 
-## Development
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-This project is being developed incrementally with the following phases:
-1. Basic project setup and structure
-2. User authentication system
-3. Message storage and retrieval
-4. Git integration
-5. Real-time updates
-6. UI improvements
+3. Set up your environment variables:
+   - Copy `.env.template` to `.env`
+   - Add your GitHub token and repository details
 
-## Security Notes
+4. Run the server:
+   ```bash
+   python server.py
+   ```
 
-- Never commit your `.env` file containing sensitive credentials
-- Use environment variables for all sensitive information
-- Implement proper input validation and sanitization
-- Follow security best practices for user authentication
+5. Access the application:
+   - Open your browser to `http://localhost:8088`
+   - Set your username using the button in the top right
+   - Start chatting!
+
+## Usage Guide
+
+### Sending Messages
+1. Type your message in the text box at the bottom
+2. Press Enter or click Send
+3. Messages are automatically backed up to GitHub
+
+### Setting Your Username
+1. Click the "Username" button in the top right
+2. Enter your desired username
+3. Click Save
+4. Your username persists across page refreshes
+
+### Using Reactions
+1. Hover over any message
+2. Click the "React" button
+3. Choose an emoji from the popup menu
+4. View reactions by hovering over the emoji
+5. Multiple reactions per user are supported
+6. Reaction history is preserved even when changing usernames
+
+### Message History
+- All messages are stored in SQLite database
+- Messages are automatically backed up to GitHub
+- Full message history is preserved
+- Timestamps show when messages were sent
+
+## Technical Details
+
+### Backend
+- Python-based HTTP server
+- SQLite database for message storage
+- Git integration for automatic backups
+- Environment variable configuration
+
+### Frontend
+- Pure JavaScript (no frameworks)
+- LocalStorage for user preferences
+- Real-time updates
+- Modern CSS styling
+
+### Data Storage
+- Messages: SQLite + Git backup
+- Reactions: LocalStorage
+- User preferences: LocalStorage
+- Username history: Preserved with reactions
+
+## Security Features
+- No sensitive data storage
+- GitHub token protection
+- SQLite database security
+- Cross-site scripting protection
+
+## Contributing
+Feel free to submit issues and enhancement requests!
 
 ## License
-
-MIT License
+MIT License - See LICENSE file for details
