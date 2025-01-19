@@ -612,7 +612,8 @@
         const errorDiv = document.getElementById('error');
         const messagesDiv = document.getElementById('messages');
         let isSubmitting = false;
-        let lastMessageTimestamp = null;
+        let lastMessageId = 0;
+        let messageRefreshInterval;
         let currentUsername = localStorage.getItem('username') || 'anonymous';
         document.getElementById('username-display').textContent = currentUsername;
 
@@ -755,6 +756,95 @@
             }
         });
 
+        async function loadMessages(showLoading = true) {
+            if (showLoading) {
+                messagesDiv.innerHTML = '<div class="loading"></div>';
+            }
+            try {
+                const response = await fetch('/messages');
+                const messages = await response.json();
+                
+                // Check if we have new messages
+                const latestMessageId = messages.length > 0 ? messages[messages.length - 1].id : 0;
+                if (!showLoading && latestMessageId <= lastMessageId) {
+                    return; // No new messages
+                }
+                
+                lastMessageId = latestMessageId;
+                messagesDiv.innerHTML = '';
+                
+                // Show messages oldest to newest
+                messages.forEach(message => {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message';
+                    messageDiv.setAttribute('data-message-id', message.id);
+                    messageDiv.innerHTML = `
+                        <div class="message-header">
+                            <span class="message-username">${escapeHtml(message.author || 'Anonymous')}</span>
+                            <span class="message-timestamp">${formatDate(message.timestamp)}</span>
+                        </div>
+                        <div class="message-content">
+                            ${escapeHtml(message.content)}
+                        </div>
+                        <div class="reaction-container">
+                            <button class="react-button">React</button>
+                        </div>
+                    `;
+
+                    messagesDiv.appendChild(messageDiv);
+
+                    // Add click handler to the react button
+                    const reactButton = messageDiv.querySelector('.react-button');
+                    if (reactButton) {
+                        reactButton.addEventListener('click', function(e) {
+                            showEmojiMenu(this, message.id);
+                            e.stopPropagation();
+                        });
+                    }
+                });
+
+                // Scroll to bottom if we're already near the bottom or this is initial load
+                const isNearBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop - messagesDiv.clientHeight < 100;
+                if (showLoading || isNearBottom) {
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                showError('Failed to load messages');
+            }
+        }
+
+        async function sendMessage(content) {
+            try {
+                const timestamp = new Date().toISOString();
+                const response = await fetch('/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: content,
+                        author: currentUsername,
+                        timestamp: timestamp
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // Clear input and load new messages
+                messageInput.value = '';
+                await loadMessages(false);
+                
+                // Scroll to bottom
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showError('Failed to send message');
+            }
+        }
+
         messageForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const content = messageInput.value.trim();
@@ -764,27 +854,9 @@
             messageInput.disabled = true;
 
             try {
-                const response = await fetch('/messages', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        content: content,
-                        author: currentUsername
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to send message');
-                }
-
-                messageInput.value = '';
-                await loadMessages(false);
-                
-                // Scroll to the bottom after sending a new message
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                await sendMessage(content);
             } catch (error) {
+                console.error('Error sending message:', error);
                 showError('Failed to send message');
             } finally {
                 sendButton.disabled = false;
@@ -793,68 +865,33 @@
             }
         });
 
-        async function loadMessages(showLoading = true) {
-            if (showLoading) {
-                messagesDiv.innerHTML = '<div class="loading"></div>';
-            }
-            try {
-                const response = await fetch('/messages');
-                const data = await response.json();
-                
-                // Don't clear if we're auto-refreshing and there are no new messages
-                if (showLoading || data.length !== messagesDiv.children.length) {
-                    messagesDiv.innerHTML = '';
-                    // Reverse the data array to show oldest messages first
-                    data.reverse().forEach(message => {
-                        const messageDiv = document.createElement('div');
-                        messageDiv.className = 'message';
-                        const messageId = message.id || message.timestamp;
-                        messageDiv.setAttribute('data-message-id', messageId);
-                        messageDiv.innerHTML = `
-                            <div class="message-header">
-                                <span class="message-username">${escapeHtml(message.author || 'Anonymous')}</span>
-                                <span class="message-timestamp">${formatDate(message.timestamp)}</span>
-                            </div>
-                            <div class="message-content">
-                                ${escapeHtml(message.content)}
-                            </div>
-                            <div class="reaction-container">
-                                <button class="react-button">React</button>
-                            </div>
-                        `;
-
-                        messagesDiv.appendChild(messageDiv);
-
-                        // Add click handler to the react button
-                        const reactButton = messageDiv.querySelector('.react-button');
-                        if (reactButton) {
-                            reactButton.addEventListener('click', function(e) {
-                                showEmojiMenu(this, messageId);
-                                e.stopPropagation();
-                            });
-                        }
-
-                        // Restore any previous reaction
-                        const savedReactions = localStorage.getItem(`reactions-${messageId}`);
-                        if (savedReactions && savedReactions !== '') {
-                            try {
-                                const reactions = JSON.parse(savedReactions);
-                                messageReactions.set(messageId, reactions);
-                                updateReactionDisplay(messageId, messageDiv.querySelector('.reaction-container'));
-                            } catch (e) {
-                                // Handle old format reactions
-                                const reactionData = JSON.parse(savedReactions);
-                                messageReactions.set(messageId, [reactionData]);
-                                updateReactionDisplay(messageId, messageDiv.querySelector('.reaction-container'));
-                            }
-                        }
-                    });
-
-                    // Scroll to the bottom after loading messages
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        // Start message refresh when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            startMessageRefresh();
+            
+            // Handle page visibility
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    stopMessageRefresh();
+                } else {
+                    startMessageRefresh();
                 }
-            } catch (error) {
-                showError('Failed to load messages');
+            });
+        });
+
+        function startMessageRefresh() {
+            // Initial load
+            loadMessages();
+            
+            // Set up auto-refresh
+            messageRefreshInterval = setInterval(() => {
+                loadMessages(false);
+            }, 1000);  // Check for new messages every second
+        }
+
+        function stopMessageRefresh() {
+            if (messageRefreshInterval) {
+                clearInterval(messageRefreshInterval);
             }
         }
 
@@ -919,39 +956,6 @@
             }
         `;
         document.head.appendChild(style);
-
-        // Load messages when page loads
-        let messageRefreshInterval;
-        
-        function startMessageRefresh() {
-            // Initial load
-            loadMessages();
-            
-            // Set up auto-refresh
-            messageRefreshInterval = setInterval(() => {
-                loadMessages(false);  // Don't show loading indicator for auto-refresh
-            }, 2000);  // Refresh every 2 seconds
-        }
-
-        function stopMessageRefresh() {
-            if (messageRefreshInterval) {
-                clearInterval(messageRefreshInterval);
-            }
-        }
-
-        // Start refreshing when page loads
-        window.addEventListener('DOMContentLoaded', () => {
-            startMessageRefresh();
-            
-            // Stop refreshing when page is hidden
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    stopMessageRefresh();
-                } else {
-                    startMessageRefresh();
-                }
-            });
-        });
 
         // Refresh messages periodically (every 5 seconds, without showing loading state)
         // setInterval(() => loadMessages(false), 5000);

@@ -29,7 +29,9 @@ class DatabaseManager:
                 print("GitHub integration enabled")
             except Exception as e:
                 print(f"GitHub integration disabled: {str(e)}")
-        
+        self.connection = None
+        self.lock = threading.Lock()
+
     def _init_database(self) -> None:
         """Initialize the database with the schema."""
         try:
@@ -71,15 +73,11 @@ class DatabaseManager:
             raise
 
     def get_connection(self):
-        """Get a database connection."""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            return conn
-        except Exception as e:
-            print(f"Error connecting to database: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
-            raise
+        """Get a thread-safe database connection."""
+        if self.connection is None:
+            self.connection = sqlite3.connect(self.db_path)
+            self.connection.row_factory = sqlite3.Row
+        return self.connection
 
     def add_repository(self, name: str, url: str) -> int:
         """Add a new repository to track."""
@@ -105,9 +103,10 @@ class DatabaseManager:
             raise
 
     def save_message(self, content: str, timestamp: str, author: str, repository_id: int = 1) -> bool:
-        """Save a new message to the database and optionally push to GitHub."""
+        """Save a new message to the database."""
         try:
-            with self.get_connection() as conn:
+            with self.lock:  # Thread-safe database access
+                conn = self.get_connection()
                 cursor = conn.execute(
                     """
                     INSERT INTO messages (repository_id, content, timestamp, author)
@@ -116,18 +115,11 @@ class DatabaseManager:
                     (repository_id, content, timestamp, author)
                 )
                 conn.commit()
-
-            # Only try to push to GitHub if it's enabled and configured
-            if self.github_enabled and hasattr(self, 'github'):
-                try:
-                    self.push_to_github()
-                except Exception as e:
-                    print(f"Warning: Failed to push to GitHub: {str(e)}")
-                    # Continue anyway - the message is saved in the database
-            
-            return True
+                return True
         except Exception as e:
             print(f"Error saving message: {str(e)}")
+            if self.connection:
+                self.connection.rollback()
             raise
 
     def push_to_github(self):
@@ -193,10 +185,11 @@ class DatabaseManager:
             return [dict(row) for row in cursor.fetchall()]
         
     def get_messages(self, limit: Optional[int] = None, offset: int = 0,
-                    sort_order: str = "DESC") -> List[Dict[str, Any]]:
+                    sort_order: str = "ASC") -> List[Dict[str, Any]]:
         """Get messages from the database."""
         try:
-            with self.get_connection() as conn:
+            with self.lock:  # Thread-safe database access
+                conn = self.get_connection()
                 query = """
                     SELECT m.*, r.name as repository_name 
                     FROM messages m
@@ -217,7 +210,8 @@ class DatabaseManager:
                         'content': row['content'],
                         'timestamp': row['timestamp'],
                         'author': row['author'],
-                        'repository': row['repository_name']
+                        'repository': row['repository_name'],
+                        'created_at': row['created_at']
                     })
                 return messages
         except Exception as e:
