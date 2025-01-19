@@ -32,12 +32,16 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 - Git-based version control for message history
 
 ### User Interface
-- Modern, clean design
-- Responsive layout
-- Real-time updates
-- Loading indicators
-- Error notifications
+- Modern, clean design with gradient effects and animations
+- Polished header with dynamic styling
+- Responsive layout that adapts to different screen sizes
+- Real-time updates with smooth transitions
+- Loading indicators and visual feedback
+- Error notifications with fade effects
 - Success confirmations
+- Enhanced username display with overflow handling
+- Improved message input area
+- Subtle shadows and depth effects
 
 ## Getting Started
 
@@ -62,8 +66,8 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
    ```
 
 5. Access the application:
-   - Open your browser to `http://localhost:8088`
-   - Set your username using the button in the top right
+   - Open your browser to `http://localhost:8089`
+   - Set your username using the styled button in the header
    - Start chatting!
 
 ## Usage Guide
@@ -74,10 +78,11 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 3. Messages are automatically backed up to GitHub
 
 ### Setting Your Username
-1. Click the "Username" button in the top right
-2. Enter your desired username
-3. Click Save
-4. Your username persists across page refreshes
+1. Click the "Username" button in the header area
+2. Enter your desired username in the modal
+3. Click Save to apply
+4. Your username is displayed in a clean, pill-shaped container
+5. Long usernames are gracefully truncated with ellipsis
 
 ### Using Reactions
 1. Hover over any message
