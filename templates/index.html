@@ -30,110 +30,149 @@
             color: var(--text-color);
             line-height: 1.6;
             position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            position: sticky;
+            top: 0;
+            background: linear-gradient(to right, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
+            backdrop-filter: blur(10px);
+            padding: 16px 24px;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+            margin-bottom: 20px;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            color: #2196F3;
+            font-size: 1.8em;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin: 0;
+            background: linear-gradient(120deg, #2196F3, #1976D2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+        }
+
+        h1::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, #2196F3, transparent);
+            opacity: 0.3;
         }
 
         #username-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            z-index: 1000;
-        }
-
-        #username-display {
-            color: #0366d6;
-            font-weight: 500;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 4px 8px;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 6px 12px;
+            border-radius: 30px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         #username-btn {
-            background-color: #2ea44f;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        #username-btn:hover {
-            background-color: #2c974b;
-        }
-
-        #push-container {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 100;
-        }
-
-        #pushButton {
-            background-color: #2ea44f;
+            background-color: #2196F3;
             color: white;
             border: none;
             padding: 8px 16px;
             border-radius: 20px;
             cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px var(--shadow-color);
-            width: auto;
+            font-size: 0.9em;
             font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(33, 150, 243, 0.2);
         }
 
-        #pushButton:hover {
-            background-color: #2c974b;
+        #username-btn:hover {
+            background-color: #1976D2;
             transform: translateY(-1px);
-            box-shadow: 0 4px 8px var(--shadow-color);
+            box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
         }
 
-        #pushButton:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px var(--shadow-color);
-        }
-
-        h1 {
-            color: var(--primary-color);
-            text-align: center;
-            margin: 40px 0;
-            font-size: 2.5em;
-            font-weight: 700;
-            letter-spacing: -0.5px;
+        #username-display {
+            color: #1976D2;
+            font-weight: 500;
+            font-size: 0.95em;
+            padding: 4px 12px;
+            background: rgba(33, 150, 243, 0.1);
+            border-radius: 15px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
         }
 
         #messages {
+            flex: 1;
             background: white;
             border-radius: 12px;
             padding: 20px;
             margin: 20px 0;
             box-shadow: 0 4px 6px var(--shadow-color);
-            max-height: 500px;
+            max-height: calc(100vh - 300px);
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: var(--primary-color) var(--background-color);
-            display: flex;
-            flex-direction: column;
         }
 
-        #messages::-webkit-scrollbar {
-            width: 8px;
+        #message-form {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            margin-top: auto;
+            box-shadow: 0 -4px 6px var(--shadow-color);
+            border-radius: 0 0 12px 12px;
         }
 
-        #messages::-webkit-scrollbar-track {
-            background: var(--background-color);
-            border-radius: 4px;
+        #message-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+            resize: none;
+            min-height: 60px;
+            margin-bottom: 10px;
         }
 
-        #messages::-webkit-scrollbar-thumb {
+        #message-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        #send-button {
             background-color: var(--primary-color);
-            border-radius: 4px;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            float: right;
+        }
+
+        #send-button:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-1px);
         }
 
         .message {
@@ -300,60 +339,6 @@
         .selected-emoji:hover .emoji-tooltip {
             opacity: 1;
             transform: translateX(-50%) translateY(0);
-        }
-
-        #messageForm {
-            background: white;
-            padding: 24px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px var(--shadow-color);
-            margin-top: 20px;
-        }
-
-        textarea {
-            width: 100%;
-            padding: 16px;
-            margin-bottom: 16px;
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            font-size: 1em;
-            resize: vertical;
-            min-height: 100px;
-            transition: all 0.3s ease;
-            font-family: inherit;
-        }
-
-        textarea:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
-        }
-
-        button {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            width: 100%;
-            box-shadow: 0 2px 4px var(--shadow-color);
-        }
-
-        button:hover:not(:disabled) {
-            background-color: var(--primary-dark);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px var(--shadow-color);
-        }
-
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
         }
 
         .error {
@@ -597,15 +582,21 @@
     </style>
 </head>
 <body>
-    <div id="username-container">
-        <button id="username-btn">Username</button>
-        <span id="username-display"></span>
-    </div>
-
     <div class="header">
         <h1>GroupChat</h1>
+        <div id="username-container">
+            <button id="username-btn">Username</button>
+            <span id="username-display"></span>
+        </div>
     </div>
-    
+
+    <div id="messages"></div>
+
+    <form id="message-form">
+        <textarea id="message-input" placeholder="Type your message here..." rows="3"></textarea>
+        <button type="submit" id="send-button">Send</button>
+    </form>
+
     <div class="modal-overlay" id="modal-overlay"></div>
     <div id="username-modal">
         <h3>Set Username</h3>
@@ -614,27 +605,10 @@
         <button class="cancel" id="cancel-username">Cancel</button>
     </div>
 
-    <h1>GroupChat</h1>
-    
-    <div id="messages">
-        <div class="loading"></div>
-    </div>
-
-    <form id="messageForm">
-        <textarea 
-            id="messageContent" 
-            rows="4" 
-            placeholder="Type your message here..."
-            maxlength="500"
-        ></textarea>
-        <button type="submit" id="submitButton">Send Message</button>
-        <div id="error" class="error"></div>
-    </form>
-
     <script>
-        const messageForm = document.getElementById('messageForm');
-        const messageContent = document.getElementById('messageContent');
-        const submitButton = document.getElementById('submitButton');
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
         const errorDiv = document.getElementById('error');
         const messagesDiv = document.getElementById('messages');
         let isSubmitting = false;
@@ -783,11 +757,11 @@
 
         messageForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const content = messageContent.value.trim();
+            const content = messageInput.value.trim();
             if (!content) return;
 
-            submitButton.disabled = true;
-            messageContent.disabled = true;
+            sendButton.disabled = true;
+            messageInput.disabled = true;
 
             try {
                 const response = await fetch('/messages', {
@@ -805,7 +779,7 @@
                     throw new Error('Failed to send message');
                 }
 
-                messageContent.value = '';
+                messageInput.value = '';
                 await loadMessages(false);
                 
                 // Scroll to the bottom after sending a new message
@@ -813,9 +787,9 @@
             } catch (error) {
                 showError('Failed to send message');
             } finally {
-                submitButton.disabled = false;
-                messageContent.disabled = false;
-                messageContent.focus();
+                sendButton.disabled = false;
+                messageInput.disabled = false;
+                messageInput.focus();
             }
         });
 
@@ -950,10 +924,10 @@
         setInterval(() => loadMessages(false), 5000);
 
         // Enable submit on Ctrl+Enter or Cmd+Enter
-        messageContent.addEventListener('keydown', (e) => {
+        messageInput.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                 e.preventDefault();
-                submitButton.click();
+                sendButton.click();
             }
         });
 

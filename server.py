@@ -489,7 +489,7 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
             traceback.print_exc()
             raise
 
-def run_server(port: int = 8088) -> None:
+def run_server(port: int = 8089) -> None:
     """
     Run the HTTP server on the specified port.
     
