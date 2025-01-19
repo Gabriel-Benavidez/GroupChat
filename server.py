@@ -102,16 +102,16 @@ class DatabaseManager:
             print(f"Traceback: {traceback.format_exc()}")
             raise
 
-    def save_message(self, content: str, timestamp: str, author: str) -> bool:
+    def save_message(self, content: str, timestamp: str, author: str, repository_id: int = 1) -> bool:
         """Save a new message to the database and optionally push to GitHub."""
         try:
             with self.get_connection() as conn:
                 cursor = conn.execute(
                     """
-                    INSERT INTO messages (content, timestamp, author)
-                    VALUES (?, ?, ?)
+                    INSERT INTO messages (repository_id, content, timestamp, author)
+                    VALUES (?, ?, ?, ?)
                     """,
-                    (content, timestamp, author)
+                    (repository_id, content, timestamp, author)
                 )
                 conn.commit()
 
@@ -361,10 +361,12 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                 
                 # Save message with author
                 timestamp = datetime.now(timezone.utc).isoformat()
+                repository_id = data.get('repository_id', 1)
                 self.db_manager.save_message(
                     content=content,
                     timestamp=timestamp,
-                    author=author
+                    author=author,
+                    repository_id=repository_id
                 )
                 
                 self.send_json_response({'status': 'success'})
@@ -430,7 +432,8 @@ class MessageHandler(http.server.SimpleHTTPRequestHandler):
                     message_id = self.db_manager.save_message(
                         content=content,
                         timestamp=timestamp,
-                        author=author
+                        author=author,
+                        repository_id=repository_id
                     )
                     
                     print(f"Saved message with ID: {message_id}")
