@@ -43,6 +43,70 @@ A real-time group chat application with optional GitHub backup, multi-user suppo
 - Improved message input area
 - Subtle shadows and depth effects
 
+## Quick Start Guide
+
+Just want to get chatting? Follow these simple steps:
+
+1. **Install Python** (if you don't have it):
+   - Download Python 3.7 or higher from [python.org](https://www.python.org/downloads/)
+   - During installation, make sure to check "Add Python to PATH"
+
+2. **Download this app**:
+   ```bash
+   git clone https://github.com/Gabriel-Benavidez/GroupChat.git
+   cd GroupChat
+   ```
+
+3. **Set up the app**:
+   ```bash
+   # Create a virtual environment
+   python3 -m venv venv
+
+   # Activate it:
+   # On Windows:
+   venv\Scripts\activate
+   # On Mac/Linux:
+   source venv/bin/activate
+
+   # Install required packages
+   pip install -r requirements.txt
+
+   # Initialize the database
+   python3 init_db.py
+   ```
+
+4. **Start the chat**:
+   ```bash
+   python3 server.py
+   ```
+
+5. **Open in your browser**:
+   - Go to: http://localhost:8089
+   - Enter your username
+   - Start chatting!
+
+That's it! The app is now running on your computer.
+
+## Troubleshooting Common Issues
+
+- **"Python command not found"**:
+  - Make sure Python is installed and added to PATH
+  - Try using `python` instead of `python3`
+
+- **"Port already in use"**:
+  - Another program is using port 8089
+  - Close other applications or change the port in `server.py`
+
+- **"Module not found"**:
+  - Make sure you activated the virtual environment
+  - Run `pip install -r requirements.txt` again
+
+- **"Database error"**:
+  - Delete `database/messages.db`
+  - Run `python3 init_db.py` again
+
+For more detailed setup instructions and features, read on below.
+
 ## Getting Started
 
 ### Prerequisites
