@@ -21,7 +21,12 @@ class DatabaseManager:
         self.db_path = db_path
         print(f"Initializing DatabaseManager with path: {db_path}")
         self._init_database()
-        self.github = GitHubManager()
+        try:
+            self.github = GitHubManager()
+            self.github_enabled = True
+        except (ValueError, Exception) as e:
+            print(f"GitHub integration disabled: {str(e)}")
+            self.github_enabled = False
         
     def _init_database(self) -> None:
         """Initialize the database with the schema."""
@@ -99,69 +104,84 @@ class DatabaseManager:
             print(f"Traceback: {traceback.format_exc()}")
             raise
 
-    def save_message(self, repository_id: int, content: str, timestamp: str, author: str) -> int:
-        """Save a new message to the database and push to GitHub."""
+    def save_message(self, repository_id: int, content: str, timestamp: str, author: str):
+        """Save a new message to the database and optionally push to GitHub."""
         try:
             with self.get_connection() as conn:
-                cursor = conn.execute("""
-                    INSERT INTO messages 
-                    (repository_id, content, timestamp, author, message_type)
-                    VALUES (?, ?, ?, ?, 'local')
-                """, (repository_id, content, timestamp, author))
+                cursor = conn.execute(
+                    """
+                    INSERT INTO messages (repository_id, content, timestamp, author)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (repository_id, content, timestamp, author)
+                )
                 conn.commit()
-                message_id = cursor.lastrowid
-                
-                # Push to GitHub
-                success, message = self.push_to_github()
-                if not success:
-                    print(f"Warning: Failed to push to GitHub: {message}")
-                
-                return message_id
+
+            # Only try to push to GitHub if it's enabled
+            if self.github_enabled:
+                try:
+                    self.push_to_github()
+                except Exception as e:
+                    print(f"Warning: Failed to push to GitHub: {str(e)}")
+                    # Continue anyway - the message is saved in the database
+            
+            return True
         except Exception as e:
-            print(f"Error in save_message: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
+            print(f"Error saving message: {str(e)}")
             raise
 
     def push_to_github(self):
-        """Push messages.db to GitHub"""
+        """Push messages.db to GitHub if enabled."""
+        if not self.github_enabled:
+            print("GitHub integration is disabled - skipping push")
+            return
+            
         try:
             repo_root = os.path.dirname(os.path.abspath(__file__))
             print(f"Repository root: {repo_root}")
             
             # Add messages.db to git
-            db_path = os.path.join('database', 'messages.db')
-            subprocess.run(['git', 'add', db_path], check=True, cwd=repo_root)
-            
-            # Check if there are changes to commit
-            status = subprocess.run(['git', 'status', '--porcelain'], 
-                                 capture_output=True, text=True, cwd=repo_root)
-            
-            if not status.stdout.strip():
-                print("No changes to commit")
-                return True, "No changes to commit"
-            
+            result = subprocess.run(
+                ['git', 'add', 'database/messages.db'],
+                check=False,  # Don't raise exception on error
+                cwd=repo_root,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                print(f"Warning: git add failed: {result.stderr}")
+                return
+
             # Create a commit with timestamp
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             commit_message = f'Update messages - {current_time}'
             
-            # Commit changes
-            subprocess.run(['git', 'commit', '-m', commit_message], check=True, cwd=repo_root)
-            
-            # Push to GitHub
-            push_result = subprocess.run(['git', 'push', 'origin', 'main'], 
-                                      capture_output=True, text=True, check=True, cwd=repo_root)
-            
-            print("Successfully pushed to GitHub")
-            return True, "Successfully pushed to GitHub"
-            
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Git operation failed: {e.stderr if hasattr(e, 'stderr') else str(e)}"
-            print(error_msg)
-            return False, error_msg
+            result = subprocess.run(
+                ['git', 'commit', '-m', commit_message],
+                check=False,  # Don't raise exception on error
+                cwd=repo_root,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                print(f"Warning: git commit failed: {result.stderr}")
+                return
+
+            # Push to remote
+            result = subprocess.run(
+                ['git', 'push', 'origin', 'main'],
+                check=False,  # Don't raise exception on error
+                cwd=repo_root,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                print(f"Warning: git push failed: {result.stderr}")
+                return
+
         except Exception as e:
-            error_msg = f"Error: {str(e)}"
-            print(error_msg)
-            return False, error_msg
+            print(f"Warning: Error during GitHub push: {str(e)}")
+            # Continue anyway - the message is saved in the database
 
     def get_repositories(self, active_only: bool = True) -> List[Dict]:
         """Get list of tracked repositories."""

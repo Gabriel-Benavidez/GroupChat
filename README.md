@@ -1,6 +1,6 @@
 # GroupChat
 
-A real-time group chat application with automatic GitHub backup, multi-user support, and rich interaction features.
+A real-time group chat application with optional GitHub backup, multi-user support, and rich interaction features.
 
 ## Features
 
@@ -8,7 +8,7 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 - Real-time message sending and receiving
 - Clean, modern interface
 - Message history preservation
-- Automatic GitHub backup of all messages
+- Optional automatic GitHub backup of all messages
 - Automatic timestamps on messages
 
 ### User Management
@@ -26,10 +26,10 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 - Available emojis: 👍 ❤️ 😊 🎉 👏 🚀 😢 😂 🤔
 
 ### Data Storage & Backup
-- Automatic backup to GitHub after each message
+- Local SQLite database for message storage
+- Optional GitHub integration for automatic backup
 - Local storage for reactions and user preferences
-- SQLite database for message storage
-- Git-based version control for message history
+- Git-based version control (when GitHub is configured)
 
 ### User Interface
 - Modern, clean design with gradient effects and animations
@@ -65,6 +65,13 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
    # Should show Python 3.7 or higher
    ```
 
+3. (Optional) If you want to use GitHub backup:
+   ```bash
+   # Configure Git user
+   git config --global user.name "Your Name"
+   git config --global user.email "your.email@example.com"
+   ```
+
 ### Installation
 1. Clone the repository:
    ```bash
@@ -94,7 +101,7 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
    python3 init_db.py
    ```
 
-5. Set up your environment variables:
+5. (Optional) Set up GitHub integration:
    ```bash
    # Copy the template file
    cp .env.template .env
@@ -102,8 +109,8 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
    # Edit .env file with your GitHub details
    # Replace these values with your own:
    GITHUB_TOKEN=your_token_here
-   GITHUB_USERNAME=your_username
-   GITHUB_REPO=your_repo_name
+   
+   # If you skip this step, the app will work without GitHub backup
    ```
 
 ### Running the Application
@@ -120,6 +127,7 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 ### Troubleshooting
 - If you see "command not found" errors, make sure Python is installed and in your PATH
 - If you get syntax errors, ensure you're using Python 3.7 or higher
+- If you see Git-related errors, they can be safely ignored if you haven't set up GitHub integration
 - If the database fails to initialize, check that you have write permissions in the directory
 - For any other issues, please check the GitHub issues page or create a new issue
 
@@ -128,7 +136,7 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 ### Sending Messages
 1. Type your message in the text box at the bottom
 2. Press Enter or click Send
-3. Messages are automatically backed up to GitHub
+3. Messages are automatically stored in the local database
 
 ### Setting Your Username
 1. Click the "Username" button in the header area
@@ -147,7 +155,7 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 
 ### Message History
 - All messages are stored in SQLite database
-- Messages are automatically backed up to GitHub
+- Messages are optionally backed up to GitHub
 - Full message history is preserved
 - Timestamps show when messages were sent
 
@@ -156,7 +164,7 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 ### Backend
 - Python-based HTTP server
 - SQLite database for message storage
-- Git integration for automatic backups
+- Optional Git integration for automatic backups
 - Environment variable configuration
 
 ### Frontend
@@ -166,7 +174,7 @@ A real-time group chat application with automatic GitHub backup, multi-user supp
 - Modern CSS styling
 
 ### Data Storage
-- Messages: SQLite + Git backup
+- Messages: SQLite + optional Git backup
 - Reactions: LocalStorage
 - User preferences: LocalStorage
 - Username history: Preserved with reactions
