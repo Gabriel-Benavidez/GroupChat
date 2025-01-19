@@ -15,6 +15,7 @@ class DatabaseInitializer:
             db_path: Path to the SQLite database file
         """
         self.db_path = db_path
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.schema_path = "database/schema.sql"
         
     def init_database(self) -> None:
@@ -26,27 +27,26 @@ class DatabaseInitializer:
 
             # Connect to database
             with sqlite3.connect(self.db_path) as conn:
-                # Drop existing tables if they exist
-                conn.executescript("""
-                    DROP TABLE IF EXISTS messages;
-                    DROP TABLE IF EXISTS repositories;
-                """)
-                
-                # Create fresh tables
+                # Execute schema - tables will only be created if they don't exist
                 conn.executescript(schema)
                 
-                # Insert default repository
+                # Insert default repository if it doesn't exist
                 conn.execute("""
-                    INSERT INTO repositories (name, url) 
-                    VALUES (?, ?)
-                """, ('Default Repository', 'local'))
+                    INSERT OR IGNORE INTO repositories (id, name, url) 
+                    VALUES (1, 'Default Repository', 'local')
+                """)
                 
-                # Insert test message
-                timestamp = datetime.now(timezone.utc).isoformat()
-                conn.execute("""
-                    INSERT INTO messages (repository_id, content, timestamp, author, git_commit_hash)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (1, 'Welcome to GroupChat!', timestamp, 'System', None))
+                # Check if we have any messages
+                cursor = conn.execute("SELECT COUNT(*) as count FROM messages")
+                message_count = cursor.fetchone()[0]
+                
+                # Only insert welcome message if there are no messages
+                if message_count == 0:
+                    timestamp = datetime.now(timezone.utc).isoformat()
+                    conn.execute("""
+                        INSERT INTO messages (repository_id, content, timestamp, author, git_commit_hash)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (1, 'Welcome to GroupChat!', timestamp, 'System', None))
                 
                 conn.commit()
                 print("Database initialized successfully!")
@@ -71,10 +71,9 @@ class DatabaseInitializer:
                 raise
 
 def main():
-    """Initialize the database and add a test message."""
+    """Initialize the database."""
     initializer = DatabaseInitializer()
     initializer.init_database()
-    initializer.add_test_message()
 
 if __name__ == "__main__":
     main()

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS repositories (
 
 -- Default repository
 INSERT OR IGNORE INTO repositories (id, name, url) 
-VALUES (1, 'default', 'default');
+VALUES (1, 'Default Repository', 'local');
 
 -- Messages table schema
 CREATE TABLE IF NOT EXISTS messages (
@@ -20,15 +20,11 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL,
     timestamp TEXT NOT NULL,
     author TEXT,
+    git_commit_hash TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (repository_id) REFERENCES repositories(id)
 );
 
--- Add git_commit_hash column if it doesn't exist
-ALTER TABLE messages ADD COLUMN git_commit_hash TEXT;
-
--- Index for faster timestamp-based queries
+-- Create indexes if they don't exist
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(created_at);
-
--- Index for git commit hash lookups
 CREATE INDEX IF NOT EXISTS idx_messages_git_hash ON messages(git_commit_hash);
